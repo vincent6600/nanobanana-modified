@@ -5,13 +5,13 @@
 ### 修复内容
 - **模型ID修复**: 修复了ChatGPT DALL-E 3模型的无效模型ID错误
 - **原问题**: OpenRouter上没有`openai/dall-e-3`模型，导致400 Bad Request错误
-- **解决方案**: 使用OpenRouter上实际可用的`openai/gpt-5-image`模型
+- **解决方案**: 使用OpenRouter上实际可用的`openai/gpt-5-image-mini`模型
 
 **具体变更**:
 - 错误信息: `"openai/dall-e-3 is not a valid model ID"`
-- 修复方案: 改用 `openai/gpt-5-image` 模型
+- 修复方案: 改用 `openai/gpt-5-image-mini` 模型
 - API端点: 继续使用 `https://openrouter.ai/api/v1/chat/completions`
-- 模型特点: GPT-5 Image 标准版本
+- 模型特点: GPT-5 Image Mini 版本，成本效益较高
 
 ## 📋 修改概述
 
@@ -20,15 +20,15 @@
 ## ✨ 新增功能
 
 ### 1. ChatGPT 模型支持
-- **新增模型**: ChatGPT (GPT-5 Image)
-- **API 提供商**: OpenRouter (使用 openai/gpt-5-image 模型)
+- **新增模型**: ChatGPT (GPT-5 Image Mini)
+- **API 提供商**: OpenRouter (使用 openai/gpt-5-image-mini 模型)
 - **模型标识**: `chatgpt`
 - **功能特点**:
   - 支持文生图 (text-to-image)
   - 支持图生图 (image-to-image) - 支持多模态输入
   - 支持多张图片上传（使用第一张作为参考）
   - 支持中英文提示词
-  - GPT-5 Image 标准版本
+  - GPT-5 Image Mini 版本，成本效益较高
 
 ### 2. 界面调整
 - **模型选择器顺序调整**: ChatGPT → Nano Banana → Qwen-Image → Flux → Kontext → Krea
@@ -48,7 +48,7 @@
 
 2. **GPT-5 Image API 集成**:
    - 新增 `callDALLE3()` 函数
-   - 通过OpenRouter调用 `openai/gpt-5-image` 模型
+   - 通过OpenRouter调用 `openai/gpt-5-image-mini` 模型
    - 支持图文混合输入 (prompt + images)
    - 使用OpenRouter的消息格式
    - API端点: `https://openrouter.ai/api/v1/chat/completions`
@@ -111,12 +111,12 @@ OpenRouter上没有名为`openai/dall-e-3`的模型，模型ID格式错误。
 ### 解决方案
 1. **使用正确的模型ID**: 
    - 原ID: `openai/dall-e-3` (无效)
-   - 新ID: `openai/gpt-5-image` (有效)
+   - 新ID: `openai/gpt-5-image-mini` (有效)
 
 2. **API调用结构**:
    ```typescript
    {
-     model: "openai/gpt-5-image",
+     model: "openai/gpt-5-image-mini",
      messages: [
        {
          role: "user", 
@@ -171,7 +171,7 @@ OpenRouter上没有名为`openai/dall-e-3`的模型，模型ID格式错误。
 | **提示词语言** | 中英文 | 中英文 | 英文 (Qwen 支持中文) |
 | **生成质量** | 高 | 中 | 中-高 |
 | **生成速度** | 中等 | 较快 | 较慢 |
-| **成本** | 付费 (GPT-5 Image) | 付费 | 部分免费 |
+| **成本** | 付费 (GPT-5 Image Mini) | 付费 | 部分免费 |
 
 ## 🛠️ 文件结构
 
@@ -197,7 +197,7 @@ nanobanana-modified/
    - OpenRouter API: 需要能够访问 `openrouter.ai`
    - ModelScope API: 需要能够访问 `api-inference.modelscope.cn`
 6. **GPT-5 Image 限制**: 
-   - 使用标准版本
+   - 使用Mini版本（成本优化）
    - 单次生成1张图片
    - 支持标准分辨率
 

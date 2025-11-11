@@ -46,7 +46,7 @@ async function callDALLE3(prompt: string, apiKey: string, images: string[] = [])
     
     // 构建请求体 - 使用OpenRouter上实际可用的GPT-5 Image模型
     const requestBody: any = {
-        model: "openai/gpt-5-image",  // 使用标准版本
+        model: "openai/gpt-5-image-mini",  // 使用Mini版本，成本较低
         prompt: prompt,
         n: 1
     };
