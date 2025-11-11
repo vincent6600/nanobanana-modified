@@ -15,6 +15,96 @@ function createJsonErrorResponse(message: string, statusCode = 500) {
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // =======================================================
+// 模块 0: 百度翻译API调用逻辑
+// =======================================================
+async function callBaiduTranslate(text: string, from: string, to: string, apiKey: string): Promise<any> {
+    // 生成签名
+    const salt = Date.now().toString();
+    const sign = await generateBaiduSign(text, from, to, apiKey, salt);
+    
+    const requestBody = new URLSearchParams({
+        q: text,
+        from: from,
+        to: to,
+        appid: apiKey,
+        salt: salt,
+        sign: sign
+    });
+
+    console.log(`百度翻译API请求: ${requestBody.toString()}`);
+
+    const response = await fetch('https://fanyi-api.baidu.com/api/trans/vip/translate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: requestBody.toString()
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`百度翻译API错误: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('百度翻译API响应:', JSON.stringify(data, null, 2));
+
+    // 检查百度翻译API的错误响应
+    if (data.error_code) {
+        let errorMessage = '翻译失败';
+        switch (data.error_code) {
+            case '52001':
+                errorMessage = '翻译失败：请求超时';
+                break;
+            case '52002':
+                errorMessage = '翻译失败：系统错误';
+                break;
+            case '52003':
+                errorMessage = '翻译失败：未授权用户';
+                break;
+            case '54003':
+                errorMessage = '翻译失败：API配额不足';
+                break;
+            case '54005':
+                errorMessage = '翻译失败：签名错误';
+                break;
+            case '58000':
+                errorMessage = '翻译失败：客户端IP非法';
+                break;
+            case '58001':
+                errorMessage = '翻译失败：译文语言不支持';
+                break;
+            default:
+                errorMessage = `翻译失败：${data.error_msg || '未知错误'}`;
+        }
+        throw new Error(errorMessage);
+    }
+
+    // 检查返回结果
+    if (!data.trans_result || !Array.isArray(data.trans_result) || data.trans_result.length === 0) {
+        throw new Error('翻译失败：未返回翻译结果');
+    }
+
+    return data;
+}
+
+// 生成百度翻译API签名
+async function generateBaiduSign(text: string, from: string, to: string, apiKey: string, salt: string): Promise<string> {
+    const crypto = globalThis.crypto;
+    if (!crypto) {
+        throw new Error('加密不可用');
+    }
+
+    const input = `${apiKey}${text}${salt}179***78ulDjDWy7JoNVk:`;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(input);
+    const hashBuffer = await crypto.subtle.digest('MD5', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
+// =======================================================
 // 模块 1: OpenRouter API 调用逻辑 (用于 nano banana)
 // =======================================================
 async function callOpenRouter(messages: any[], apiKey: string): Promise<{ type: 'image' | 'text'; content: string }> {
@@ -185,6 +275,43 @@ serve(async (req) => {
         return new Response(JSON.stringify({ isSet }), {
             headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
+    }
+
+    // =======================================================
+    // 翻译功能 API 路由
+    // =======================================================
+    if (pathname === "/api/translate") {
+        if (req.method !== 'POST') {
+            return createJsonErrorResponse("Only POST method is allowed", 405);
+        }
+
+        try {
+            const requestData = await req.json();
+            const { q, from = 'zh', to = 'en' } = requestData;
+
+            if (!q || q.trim() === '') {
+                return createJsonErrorResponse("Text to translate is required", 400);
+            }
+
+            // 获取百度翻译API密钥
+            const apiKey = Deno.env.get("BAIDUFANYI_API_KEY");
+            if (!apiKey) {
+                return createJsonErrorResponse("翻译服务未配置，请联系管理员", 500);
+            }
+
+            console.log(`开始翻译: "${q}" 从 ${from} 到 ${to}`);
+
+            // 调用百度翻译API
+            const result = await callBaiduTranslate(q, from, to, apiKey);
+            
+            return new Response(JSON.stringify(result), {
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+            });
+
+        } catch (error) {
+            console.error("翻译请求失败:", error);
+            return createJsonErrorResponse(error.message || "翻译服务暂时不可用", 500);
+        }
     }
 
     if (pathname === "/generate") {
