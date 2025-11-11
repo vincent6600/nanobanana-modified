@@ -93,6 +93,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         fetch('/api/modelscope-key-status').then(res => res.json()).then(data => {
             if (data.isSet) { apiKeyModelScopeInput.parentElement.style.display = 'none'; }
         }).catch(error => console.error("无法检查 ModelScope API key 状态:", error));
+
+        // 初始化翻译功能
+        setupTranslationFeatures();
     }
     
     function saveStateForModel(modelId) {
@@ -713,6 +716,153 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function fileToBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); }
+    
+    // === 翻译功能实现 ===
+    
+    function setupTranslationFeatures() {
+        // 设置翻译按钮点击事件
+        const translateBtns = document.querySelectorAll('.translate-btn');
+        translateBtns.forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const targetId = btn.dataset.target;
+                await handleTranslation(targetId, btn);
+            });
+        });
+        
+        // 设置三空格自动翻译
+        const textareas = ['prompt-input-chatgpt', 'prompt-input-nanobanana', 'prompt-input-positive', 'prompt-input-negative'];
+        textareas.forEach(id => {
+            const textarea = document.getElementById(id);
+            if (textarea) {
+                textarea.addEventListener('input', (e) => {
+                    const value = e.target.value;
+                    // 检查是否以三个空格结尾
+                    if (value.length >= 3 && value.slice(-3) === '   ') {
+                        // 移除三个空格
+                        const textBeforeSpaces = value.slice(0, -3);
+                        e.target.value = textBeforeSpaces;
+                        // 执行翻译
+                        handleTranslation(id, null, textBeforeSpaces);
+                    }
+                });
+            }
+        });
+    }
+    
+    async function handleTranslation(targetId, btn = null, textToTranslate = null) {
+        const textarea = document.getElementById(targetId);
+        if (!textarea) return;
+        
+        const text = textToTranslate || textarea.value.trim();
+        if (!text) {
+            showTranslationMessage('请先输入要翻译的文本', 'warning');
+            return;
+        }
+        
+        // 禁用按钮（如果存在）
+        if (btn) {
+            btn.disabled = true;
+            const originalText = btn.textContent;
+            btn.textContent = '翻译中...';
+        }
+        
+        try {
+            const translatedText = await translateToEnglish(text);
+            if (translatedText) {
+                textarea.value = translatedText;
+                showTranslationMessage('翻译成功', 'success');
+            } else {
+                showTranslationMessage('翻译失败：未返回结果', 'error');
+            }
+        } catch (error) {
+            console.error('翻译失败:', error);
+            let errorMessage = '翻译失败';
+            if (error.message.includes('network') || error.message.includes('fetch')) {
+                errorMessage = '翻译失败：网络连接问题';
+            } else if (error.message.includes('quota') || error.message.includes('limit')) {
+                errorMessage = '翻译失败：API配额不足';
+            } else if (error.message.includes('api') || error.message.includes('key')) {
+                errorMessage = '翻译失败：API密钥错误';
+            } else {
+                errorMessage = '翻译失败：' + error.message;
+            }
+            showTranslationMessage(errorMessage, 'error');
+        } finally {
+            // 恢复按钮
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '翻译';
+            }
+        }
+    }
+    
+    async function translateToEnglish(text) {
+        const response = await fetch('/api/translate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                q: text,
+                from: 'zh',
+                to: 'en'
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: '未知错误' }));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        return data.trans_result ? data.trans_result[0].dst : null;
+    }
+    
+    function showTranslationMessage(message, type) {
+        const existingMsg = document.querySelector('.translation-message');
+        if (existingMsg) {
+            existingMsg.remove();
+        }
+        
+        const msg = document.createElement('div');
+        msg.className = `translation-message translation-${type}`;
+        msg.textContent = message;
+        
+        const colors = {
+            success: '#4CAF50',
+            error: '#f44336',
+            warning: '#FF9800'
+        };
+        
+        msg.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: ${colors[type] || '#333'};
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+            animation: fadeInOut 3s ease-in-out;
+            max-width: 300px;
+            text-align: center;
+        `;
+        
+        document.body.appendChild(msg);
+        
+        setTimeout(() => {
+            if (msg.parentNode) {
+                msg.parentNode.removeChild(msg);
+            }
+        }, 3000);
+    }
     
     initialize();
 });
