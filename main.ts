@@ -273,6 +273,16 @@ serve(async (req) => {
         });
     }
 
+    if (pathname === "/api/modelscope-key-status") {
+        // 兼容多种环境变量名
+        const sdkToken = Deno.env.get("MODELSCOPE_SDK_TOKEN");
+        const apiKey = Deno.env.get("MODELSCOPE_API_KEY");
+        const isSet = !!(sdkToken || apiKey);
+        return new Response(JSON.stringify({ isSet }), {
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        });
+    }
+
     // =======================================================
     // 翻译功能 API 路由
     // =======================================================
@@ -346,7 +356,10 @@ serve(async (req) => {
                     return createJsonErrorResponse(`Model returned text instead of an image: "${result.content}"`, 400);
                 }
             } else {
-                const modelscopeApiKey = apikey || Deno.env.get("MODELSCOPE_SDK_TOKEN");
+                // 兼容多种环境变量名
+                const modelscopeApiKey = apikey || 
+                    Deno.env.get("MODELSCOPE_SDK_TOKEN") || 
+                    Deno.env.get("MODELSCOPE_API_KEY");
                 if (!modelscopeApiKey) { return createJsonErrorResponse("ModelScope API key is not set.", 401); }
                 if (!parameters?.prompt) { return createJsonErrorResponse("Positive prompt is required for ModelScope models.", 400); }
                 
