@@ -269,6 +269,145 @@ document.addEventListener('DOMContentLoaded', async () => {
         ['dragleave', 'drop'].forEach(eventName => uploadAreaChatGPT.addEventListener(eventName, () => uploadAreaChatGPT.classList.remove('drag-over')));
         uploadAreaChatGPT.addEventListener('drop', (e) => handleFiles(Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/')), 'chatgpt'));
         fileInputChatGPT.addEventListener('change', (e) => handleFiles(Array.from(e.target.files).filter(file => file.type.startsWith('image/')), 'chatgpt'));
+
+        // 添加粘贴功能
+        setupPasteFunctionality();
+    }
+
+    function setupPasteFunctionality() {
+        let isMouseOverNano = false;
+        let isMouseOverChatGPT = false;
+
+        // 监听鼠标进入/离开上传区域
+        uploadAreaNano.addEventListener('mouseenter', () => { isMouseOverNano = true; });
+        uploadAreaNano.addEventListener('mouseleave', () => { isMouseOverNano = false; });
+        
+        uploadAreaChatGPT.addEventListener('mouseenter', () => { isMouseOverChatGPT = true; });
+        uploadAreaChatGPT.addEventListener('mouseleave', () => { isMouseOverChatGPT = false; });
+
+        // 监听键盘事件（全局级别，因为剪贴板事件需要在文档级别捕获）
+        document.addEventListener('keydown', async (e) => {
+            // 检查是否按下 Ctrl+V 或 Cmd+V
+            if ((e.ctrlKey || e.metaKey) && e.key === 'v' && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                
+                // 鼠标在哪个区域就处理哪个区域
+                if (isMouseOverChatGPT) {
+                    await handlePasteImage('chatgpt');
+                } else if (isMouseOverNano) {
+                    await handlePasteImage('nanobanana');
+                }
+            }
+        });
+    }
+
+    async function handlePasteImage(modelId) {
+        try {
+            // 获取剪贴板内容
+            const clipboardItems = await navigator.clipboard.read();
+            
+            for (const clipboardItem of clipboardItems) {
+                for (const type of clipboardItem.types) {
+                    if (type.startsWith('image/')) {
+                        const blob = await clipboardItem.getType(type);
+                        const file = new File([blob], `pasted-image-${Date.now()}.${type.split('/')[1]}`, { type });
+                        handleFiles([file], modelId);
+                        
+                        // 显示粘贴成功的提示
+                        showPasteSuccessHint(modelId);
+                        return;
+                    }
+                }
+            }
+            
+            // 如果没有找到图片，显示提示
+            showPasteNoImageHint();
+            
+        } catch (error) {
+            console.error('粘贴图片失败:', error);
+            showPasteErrorHint();
+        }
+    }
+
+    function showPasteSuccessHint(modelId) {
+        const container = modelId === 'chatgpt' ? uploadAreaChatGPT : uploadAreaNano;
+        const hint = document.createElement('div');
+        hint.className = 'paste-success-hint';
+        hint.innerHTML = '✅ 图片已粘贴成功';
+        hint.style.cssText = `
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #4CAF50;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+            animation: fadeInOut 2s ease-in-out;
+        `;
+        
+        container.style.position = 'relative';
+        container.appendChild(hint);
+        
+        // 2秒后移除提示
+        setTimeout(() => {
+            if (hint.parentNode) {
+                hint.parentNode.removeChild(hint);
+            }
+        }, 2000);
+    }
+
+    function showPasteNoImageHint() {
+        const hint = document.createElement('div');
+        hint.className = 'paste-no-image-hint';
+        hint.innerHTML = '❌ 剪贴板中没有图片';
+        hint.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #FF6B6B;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+            animation: fadeInOut 2s ease-in-out;
+        `;
+        
+        document.body.appendChild(hint);
+        
+        setTimeout(() => {
+            if (hint.parentNode) {
+                hint.parentNode.removeChild(hint);
+            }
+        }, 2000);
+    }
+
+    function showPasteErrorHint() {
+        const hint = document.createElement('div');
+        hint.className = 'paste-error-hint';
+        hint.innerHTML = '❌ 粘贴失败，请重试';
+        hint.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #FF6B6B;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+            animation: fadeInOut 2s ease-in-out;
+        `;
+        
+        document.body.appendChild(hint);
+        
+        setTimeout(() => {
+            if (hint.parentNode) {
+                hint.parentNode.removeChild(hint);
+            }
+        }, 2000);
     }
 
     function handleFiles(files, modelId) {

@@ -332,3 +332,27 @@ select {
     .model-card { border-radius: 0; }
     #theme-toggle-btn { top: 1rem; right: 1rem; }
 }
+
+/* 粘贴功能提示动画 */
+@keyframes fadeInOut {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    10%, 90% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+}
+
+.paste-success-hint,
+.paste-no-image-hint,
+.paste-error-hint {
+    font-family: inherit;
+    font-weight: 500;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
