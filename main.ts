@@ -20,7 +20,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function callModelScopeTranslate(text: string, apiKey: string): Promise<any> {
     console.log(`ModelScope翻译请求: "${text}"`);
     
-    // 使用ModelScope的zh2en翻译模型
+    // 使用ModelScope的标准推理API端点
     const response = await fetch('https://api-inference.modelscope.cn/api-inference/v1/models/iic/nlp_imt_translation_zh2en', {
         method: 'POST',
         headers: {
@@ -34,6 +34,7 @@ async function callModelScopeTranslate(text: string, apiKey: string): Promise<an
 
     if (!response.ok) {
         const errorText = await response.text();
+        console.error('ModelScope API错误详情:', errorText);
         throw new Error(`ModelScope翻译API错误: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
@@ -227,7 +228,7 @@ serve(async (req) => {
     }
 
     if (pathname === "/api/modelscope-key-status") {
-        const isSet = !!Deno.env.get("MODELSCOPE_API_KEY");
+        const isSet = !!Deno.env.get("MODELSCOPE_SDK_TOKEN");
         return new Response(JSON.stringify({ isSet }), {
             headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
@@ -249,10 +250,10 @@ serve(async (req) => {
                 return createJsonErrorResponse("Text to translate is required", 400);
             }
 
-            // 获取ModelScope翻译API密钥
-            const apiKey = Deno.env.get("MODELSCOPE_API_KEY");
+            // 获取ModelScope SDK Token（注意：使用的是SDK_TOKEN，不是API_KEY）
+            const apiKey = Deno.env.get("MODELSCOPE_SDK_TOKEN");
             if (!apiKey) {
-                return createJsonErrorResponse("ModelScope翻译服务未配置，请联系管理员", 500);
+                return createJsonErrorResponse("ModelScope翻译服务未配置，请设置MODELSCOPE_SDK_TOKEN环境变量", 500);
             }
 
             console.log(`开始ModelScope翻译: "${q}" 从 ${from} 到 ${to}`);
@@ -305,7 +306,7 @@ serve(async (req) => {
                     return createJsonErrorResponse(`Model returned text instead of an image: "${result.content}"`, 400);
                 }
             } else {
-                const modelscopeApiKey = apikey || Deno.env.get("MODELSCOPE_API_KEY");
+                const modelscopeApiKey = apikey || Deno.env.get("MODELSCOPE_SDK_TOKEN");
                 if (!modelscopeApiKey) { return createJsonErrorResponse("ModelScope API key is not set.", 401); }
                 if (!parameters?.prompt) { return createJsonErrorResponse("Positive prompt is required for ModelScope models.", 400); }
                 
