@@ -88,21 +88,16 @@ async function callBaiduTranslate(text: string, from: string, to: string, apiKey
     return data;
 }
 
-// 生成百度翻译API签名
+// 生成百度翻译API签名 - 使用MD5库
 async function generateBaiduSign(text: string, from: string, to: string, apiKey: string, salt: string): Promise<string> {
-    const crypto = globalThis.crypto;
-    if (!crypto) {
-        throw new Error('加密不可用');
-    }
-
     const input = `${apiKey}${text}${salt}179***78ulDjDWy7JoNVk:`;
-    const encoder = new TextEncoder();
-    const data = encoder.encode(input);
-    const hashBuffer = await crypto.subtle.digest('MD5', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex;
+    
+    // 动态导入MD5库
+    const { md5 } = await import("https://deno.land/x/deno_md5/mod.ts");
+    return md5(input);
 }
+
+
 
 // =======================================================
 // 模块 1: OpenRouter API 调用逻辑 (用于 nano banana)
