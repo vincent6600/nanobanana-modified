@@ -320,10 +320,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }
             } catch (err) {
-                console.log('现代剪贴板API不可用');
+                console.log('现代剪贴板API不可用:', err.message);
             }
 
-            // 方法2: 尝试从文件中获取（适用于从文件管理器复制的文件）
+            // 方法2: 尝试从文件系统中获取（适用于从文件管理器复制的文件）
             if (navigator.clipboard && navigator.clipboard.readFiles) {
                 try {
                     const files = await navigator.clipboard.readFiles();
@@ -334,19 +334,45 @@ document.addEventListener('DOMContentLoaded', async () => {
                         return;
                     }
                 } catch (err) {
-                    console.log('文件读取不可用');
+                    console.log('文件读取API不可用:', err.message);
                 }
             }
 
-            // 方法3: 传统拖拽粘贴处理（备用）
-            const fakeEvent = new ClipboardEvent('paste');
-            if (fakeEvent.clipboardData && fakeEvent.clipboardData.files) {
-                const imageFiles = Array.from(fakeEvent.clipboardData.files).filter(file => file.type.startsWith('image/'));
-                if (imageFiles.length > 0) {
-                    handleFiles(imageFiles, modelId);
+            // 方法3: 监听paste事件（适用于从Finder等复制的文件）
+            try {
+                const data = await new Promise((resolve) => {
+                    const handlePaste = (e) => {
+                        if (e.clipboardData && e.clipboardData.files) {
+                            const imageFiles = Array.from(e.clipboardData.files).filter(file => file.type.startsWith('image/'));
+                            if (imageFiles.length > 0) {
+                                document.removeEventListener('paste', handlePaste);
+                                resolve(imageFiles);
+                            }
+                        }
+                    };
+                    document.addEventListener('paste', handlePaste, { once: true });
+                    
+                    // 触发粘贴事件
+                    const pasteEvent = new ClipboardEvent('paste');
+                    Object.defineProperty(pasteEvent, 'clipboardData', { value: {
+                        files: []
+                    }});
+                    document.dispatchEvent(pasteEvent);
+                    
+                    // 如果2秒内没有获取到数据，清理
+                    setTimeout(() => {
+                        document.removeEventListener('paste', handlePaste);
+                        resolve([]);
+                    }, 2000);
+                });
+                
+                if (data && data.length > 0) {
+                    handleFiles(data, modelId);
                     showPasteSuccessHint(modelId);
                     return;
                 }
+            } catch (err) {
+                console.log('Paste事件监听失败:', err.message);
             }
             
             showPasteNoImageHint();

@@ -149,7 +149,29 @@ body {
     margin: 0 auto;
 }
 
-.controls-container, .result-container {
+.controls-container {
+    flex: 1;
+    background: var(--surface-color);
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px var(--shadow-color);
+    border: 1px solid var(--surface-border-color);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* 确保子元素均匀分布 */
+    transition: background-color 0.3s, border-color 0.3s;
+    min-height: 600px; /* 设置最小高度确保一致性 */
+}
+
+/* [修复] 统一所有控制面板的flex布局，确保按钮位置一致 */
+#nanobanana-controls, #modelscope-controls, #chatgpt-controls {
+    display: flex;
+    flex-direction: column;
+    min-height: 500px; /* 设置最小高度确保一致性 */
+    justify-content: space-between; /* 在项目之间分布空间 */
+}
+
+.result-container {
     flex: 1;
     background: var(--surface-color);
     padding: 2rem;
@@ -159,17 +181,7 @@ body {
     display: flex;
     flex-direction: column;
     transition: background-color 0.3s, border-color 0.3s;
-}
-
-/* [修改] 所有控制面板都使用 flex 布局 */
-#nanobanana-controls, #modelscope-controls, #chatgpt-controls {
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1; /* 占据父容器所有可用空间 */
-}
-
-.result-container {
-    min-height: 600px;
+    min-height: 600px; /* 设置最小高度确保一致性 */
 }
 
 h2 {
@@ -283,7 +295,7 @@ select {
 .error-message { color: var(--error-color); font-size: 0.85rem; margin-top: 0.5rem; min-height: 1.2em; }
 .input-error { border-color: var(--error-color) !important; }
 
-/* [修改] 移除 margin-top: auto */
+/* [修复] 统一所有控制面板的生成按钮布局 */
 .generate-btn {
     background: linear-gradient(90deg, var(--gradient-mid), var(--gradient-end));
     color: white;
@@ -299,7 +311,7 @@ select {
     justify-content: center;
     gap: 0.5rem;
     transition: transform 0.2s ease, opacity 0.2s ease;
-    margin-top: auto; /* 让按钮被推到 flex 容器的底部 */
+    margin-top: 2rem; /* 统一设置上边距 */
 }
 
 .generate-btn:not(:disabled):hover { transform: translateY(-2px); }
