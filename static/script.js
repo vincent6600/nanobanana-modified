@@ -303,24 +303,52 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function handlePasteImage(modelId) {
         try {
-            // 获取剪贴板内容
-            const clipboardItems = await navigator.clipboard.read();
+            // 尝试多种方法获取剪贴板内容
             
-            for (const clipboardItem of clipboardItems) {
-                for (const type of clipboardItem.types) {
-                    if (type.startsWith('image/')) {
-                        const blob = await clipboardItem.getType(type);
-                        const file = new File([blob], `pasted-image-${Date.now()}.${type.split('/')[1]}`, { type });
-                        handleFiles([file], modelId);
-                        
-                        // 显示粘贴成功的提示
+            // 方法1: 使用现代 Clipboard API 获取图片数据
+            try {
+                const clipboardItems = await navigator.clipboard.read();
+                for (const item of clipboardItems) {
+                    for (const type of item.types) {
+                        if (type.startsWith('image/')) {
+                            const blob = await item.getType(type);
+                            const file = new File([blob], `pasted-image-${Date.now()}.${type.split('/')[1]}`, { type });
+                            handleFiles([file], modelId);
+                            showPasteSuccessHint(modelId);
+                            return;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.log('现代剪贴板API不可用');
+            }
+
+            // 方法2: 尝试从文件中获取（适用于从文件管理器复制的文件）
+            if (navigator.clipboard && navigator.clipboard.readFiles) {
+                try {
+                    const files = await navigator.clipboard.readFiles();
+                    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+                    if (imageFiles.length > 0) {
+                        handleFiles(imageFiles, modelId);
                         showPasteSuccessHint(modelId);
                         return;
                     }
+                } catch (err) {
+                    console.log('文件读取不可用');
+                }
+            }
+
+            // 方法3: 传统拖拽粘贴处理（备用）
+            const fakeEvent = new ClipboardEvent('paste');
+            if (fakeEvent.clipboardData && fakeEvent.clipboardData.files) {
+                const imageFiles = Array.from(fakeEvent.clipboardData.files).filter(file => file.type.startsWith('image/'));
+                if (imageFiles.length > 0) {
+                    handleFiles(imageFiles, modelId);
+                    showPasteSuccessHint(modelId);
+                    return;
                 }
             }
             
-            // 如果没有找到图片，显示提示
             showPasteNoImageHint();
             
         } catch (error) {

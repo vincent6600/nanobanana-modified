@@ -161,8 +161,8 @@ body {
     transition: background-color 0.3s, border-color 0.3s;
 }
 
-/* [修改] 两个控制面板都使用 flex 布局 */
-#nanobanana-controls, #modelscope-controls {
+/* [修改] 所有控制面板都使用 flex 布局 */
+#nanobanana-controls, #modelscope-controls, #chatgpt-controls {
     display: flex;
     flex-direction: column;
     flex-grow: 1; /* 占据父容器所有可用空间 */
