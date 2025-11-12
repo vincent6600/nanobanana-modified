@@ -138,42 +138,54 @@ function md5Hash(text: string): string {
     ].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-// 生成百度翻译API签名
-function generateBaiduSignature(appId: string, secretKey: string, salt: string, timestamp: string): string {
-    const signString = `${appId}${secretKey}${salt}${timestamp}`;
-    return md5Hash(signString).toUpperCase();
+// 生成百度翻译API签名（按官方文档：appid+q+salt+密钥）
+function generateBaiduSignature(appId: string, text: string, salt: string, secretKey: string): string {
+    // 官方要求顺序：appid + q + salt + 密钥
+    const signString = `${appId}${text}${salt}${secretKey}`;
+    // 官方要求：32位小写MD5签名
+    return md5Hash(signString);
 }
 
-// 调用百度翻译API
+// 调用百度翻译API（按官方文档标准）
 async function callBaiduTranslate(text: string, appId: string, secretKey: string): Promise<any> {
     console.log(`百度翻译请求: "${text}"`);
     
     // 准备请求参数
     const salt = Math.random().toString(36).substring(2, 15);
-    const timestamp = Math.floor(Date.now() / 1000).toString();
     
-    // 生成签名
-    const sign = generateBaiduSignature(appId, secretKey, salt, timestamp);
+    // 生成签名（官方要求：签名前q不需要URL编码）
+    const sign = generateBaiduSignature(appId, text, salt, secretKey);
     
-    // 构建请求参数
+    // 构建请求参数（官方要求参数）
     const params = new URLSearchParams({
-        q: text,
+        q: text,  // 待翻译文本
         from: 'zh',
         to: 'en',
         appid: appId,
-        salt: salt,
-        timestamp: timestamp,
-        sign: sign
+        salt: salt,  // 随机数
+        sign: sign   // 签名
     });
     
-    console.log('百度翻译请求参数:', params.toString());
+    console.log('百度翻译签名字符串:', `${appId}${text}${salt}${secretKey}`);
+    console.log('百度翻译MD5签名:', sign);
     
-    // 发送请求到百度翻译API
-    const response = await fetch('https://fanyi-api.baidu.com/api/trans/vip/translate?' + params.toString(), {
-        method: 'GET',
+    // URL编码处理（官方要求：发送请求前需要对q做URL encode）
+    const encodedParams = new URLSearchParams();
+    encodedParams.set('q', encodeURIComponent(text));
+    encodedParams.set('from', 'zh');
+    encodedParams.set('to', 'en');
+    encodedParams.set('appid', appId);
+    encodedParams.set('salt', salt);
+    encodedParams.set('sign', sign);
+    
+    // 发送POST请求到百度翻译API（官方推荐POST方式）
+    const response = await fetch('https://fanyi-api.baidu.com/api/trans/vip/translate', {
+        method: 'POST',
         headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
             'User-Agent': 'Mozilla/5.0 (compatible; YourApp/1.0)'
-        }
+        },
+        body: encodedParams.toString()
     });
 
     if (!response.ok) {
