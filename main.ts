@@ -18,19 +18,130 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // 模块 0: 百度翻译API调用逻辑 (中文→英文)
 // =======================================================
 
-// MD5加密函数 (简化版，适用于百度翻译API)
-async function md5Hash(text: string): Promise<string> {
+// MD5加密函数 (Deno兼容版本)
+function md5Hash(text: string): string {
     const encoder = new TextEncoder();
     const data = encoder.encode(text);
-    const hashBuffer = await crypto.subtle.digest('MD5', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    // 使用32位整数运算实现MD5
+    const m = 0x100000000; // 2^32
+    const o = 0x800000;    // 2^23
+    const h = 0x8f000000;  // 2^31
+    
+    const s = [
+        [7, 12, 17, 22],
+        [7, 12, 17, 22],
+        [7, 12, 17, 22],
+        [7, 12, 17, 22],
+        [5, 9, 14, 20],
+        [5, 9, 14, 20],
+        [5, 9, 14, 20],
+        [5, 9, 14, 20],
+        [4, 11, 16, 23],
+        [4, 11, 16, 23],
+        [4, 11, 16, 23],
+        [4, 11, 16, 23],
+        [6, 10, 15, 21],
+        [6, 10, 15, 21],
+        [6, 10, 15, 21],
+        [6, 10, 15, 21],
+    ];
+    
+    const K = [];
+    for (let i = 0; i < 64; i++) {
+        K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * m) >>> 0;
+    }
+    
+    let a = 0x67452301;
+    let b = 0xefcdab89;
+    let c = 0x98badcfe;
+    let d = 0x10325476;
+    
+    let words = [];
+    for (let i = 0; i < data.length; i += 4) {
+        words.push(
+            ((data[i] << 24) | (data[i + 1] << 16) | (data[i + 2] << 8) | (data[i + 3])) >>> 0
+        );
+    }
+    
+    const originalBitLength = data.length * 8;
+    words[Math.floor(data.length / 4)] |= 0x80 << (24 - (data.length % 4) * 8);
+    
+    if (data.length % 4 === 0) {
+        words[14] = 0;
+    }
+    
+    while (words.length <= 14) {
+        words.push(0);
+    }
+    
+    words[14] = originalBitLength >>> 0;
+    words[15] = Math.floor(originalBitLength / m) >>> 0;
+    
+    for (let j = 0; j < 16; j++) {
+        words.push(0);
+    }
+    
+    for (let j = 0; j < 64; j++) {
+        const f = (b & c) | ((~b) & d);
+        const g = (d & b) | ((~d) & c);
+        const h = (c & b) | ((~c) & d);
+        const i = (d & c) | ((~d) & b);
+        
+        let temp;
+        let fValue;
+        let gValue;
+        
+        if (j < 16) {
+            fValue = f;
+            gValue = j;
+        } else if (j < 32) {
+            fValue = f;
+            gValue = (5 * j + 1) % 16;
+        } else if (j < 48) {
+            fValue = f;
+            gValue = (3 * j + 5) % 16;
+        } else {
+            fValue = f;
+            gValue = (7 * j) % 16;
+        }
+        
+        temp = d;
+        d = c;
+        c = b;
+        b = (b + ((a + fValue + K[j] + words[gValue]) << s[Math.floor(j / 16)][j % 4] | (a + fValue + K[j] + words[gValue]) >>> (32 - s[Math.floor(j / 16)][j % 4]))) >>> 0;
+        a = temp >>> 0;
+    }
+    
+    a = (a + 0x67452301) >>> 0;
+    b = (b + 0xefcdab89) >>> 0;
+    c = (c + 0x98badcfe) >>> 0;
+    d = (d + 0x10325476) >>> 0;
+    
+    return [
+        (a >>> 24) & 0xff,
+        (a >>> 16) & 0xff,
+        (a >>> 8) & 0xff,
+        a & 0xff,
+        (b >>> 24) & 0xff,
+        (b >>> 16) & 0xff,
+        (b >>> 8) & 0xff,
+        b & 0xff,
+        (c >>> 24) & 0xff,
+        (c >>> 16) & 0xff,
+        (c >>> 8) & 0xff,
+        c & 0xff,
+        (d >>> 24) & 0xff,
+        (d >>> 16) & 0xff,
+        (d >>> 8) & 0xff,
+        d & 0xff
+    ].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 // 生成百度翻译API签名
-async function generateBaiduSignature(appId: string, secretKey: string, salt: string, timestamp: string): Promise<string> {
+function generateBaiduSignature(appId: string, secretKey: string, salt: string, timestamp: string): string {
     const signString = `${appId}${secretKey}${salt}${timestamp}`;
-    return await md5Hash(signString);
+    return md5Hash(signString);
 }
 
 // 调用百度翻译API
@@ -42,7 +153,7 @@ async function callBaiduTranslate(text: string, appId: string, secretKey: string
     const timestamp = Math.floor(Date.now() / 1000).toString();
     
     // 生成签名
-    const sign = await generateBaiduSignature(appId, secretKey, salt, timestamp);
+    const sign = generateBaiduSignature(appId, secretKey, salt, timestamp);
     
     // 构建请求参数
     const params = new URLSearchParams({
