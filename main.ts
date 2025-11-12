@@ -141,7 +141,7 @@ function md5Hash(text: string): string {
 // 生成百度翻译API签名
 function generateBaiduSignature(appId: string, secretKey: string, salt: string, timestamp: string): string {
     const signString = `${appId}${secretKey}${salt}${timestamp}`;
-    return md5Hash(signString);
+    return md5Hash(signString).toUpperCase();
 }
 
 // 调用百度翻译API
