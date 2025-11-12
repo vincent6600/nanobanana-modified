@@ -55,7 +55,10 @@
                     <div id="thumbnails-container-chatgpt"></div>
                 </div>
                 <div class="prompt-section">
-                    <h2>2. 输入提示词 <span id="chatgpt-prompt-remark" class="prompt-remark">(支持中文提示词)</span></h2>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <h2>2. 输入提示词 <span id="chatgpt-prompt-remark" class="prompt-remark">(支持中文提示词)</span></h2>
+                        <button class="translate-btn" id="translate-chatgpt-prompt">翻译</button>
+                    </div>
                     <textarea id="prompt-input-chatgpt" placeholder="例如：一只穿着超级英雄斗篷的猫，电影级灯光"></textarea>
                 </div>
                 <!-- ChatGPT 专用的生成按钮 -->
@@ -85,7 +88,10 @@
                     <div id="thumbnails-container"></div>
                 </div>
                 <div class="prompt-section">
-                    <h2>2. 输入提示词 <span id="nanobanana-prompt-remark" class="prompt-remark"></span></h2>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <h2>2. 输入提示词 <span id="nanobanana-prompt-remark" class="prompt-remark"></span></h2>
+                        <button class="translate-btn" id="translate-nanobanana-prompt">翻译</button>
+                    </div>
                     <textarea id="prompt-input-nanobanana" placeholder="例如：一只穿着超级英雄斗篷的猫，电影级灯光"></textarea>
                 </div>
                 <!-- Nano Banana 专用的生成按钮 -->
@@ -104,11 +110,17 @@
                     <input type="password" id="api-key-input-modelscope" placeholder="请填入 Modelscope 的 API Key">
                 </div>
                 <div class="prompt-section">
-                    <h2>正向提示词 <span id="modelscope-prompt-remark" class="prompt-remark"></span></h2>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <h2>正向提示词 <span id="modelscope-prompt-remark" class="prompt-remark"></span></h2>
+                        <button class="translate-btn" id="translate-modelscope-positive">翻译</button>
+                    </div>
                     <textarea id="prompt-input-positive" placeholder="例如：A golden cat, masterpiece, best quality"></textarea>
                 </div>
                 <div class="prompt-section">
-                    <h2>负向提示词 <span id="modelscope-negative-prompt-remark" class="prompt-remark"></span></h2>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <h2>负向提示词 <span id="modelscope-negative-prompt-remark" class="prompt-remark"></span></h2>
+                        <button class="translate-btn" id="translate-modelscope-negative">翻译</button>
+                    </div>
                     <textarea id="prompt-input-negative" placeholder="例如：worst quality, low quality, normal quality"></textarea>
                 </div>
                 <div class="settings-section">
