@@ -229,31 +229,6 @@ h2 {
     min-height: 1.2em;
 }
 
-/* 翻译按钮样式 */
-.translate-btn {
-    font-size: 0.8rem;
-    color: var(--text-color-tertiary);
-    background: none;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    padding: 2px 8px;
-    cursor: pointer;
-    margin-left: auto;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-}
-
-.translate-btn:hover {
-    color: var(--gradient-mid);
-    border-color: var(--gradient-mid);
-    background-color: var(--input-hover-bg-color);
-}
-
-.translate-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
 
 .upload-area {
     border: 2px dashed var(--border-color);
