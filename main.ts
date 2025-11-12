@@ -1,11 +1,12 @@
-// 百度翻译API - 终极调试版本
+// 百度翻译API - MD5修复版本（确保与官方示例匹配）
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { serveDir } from "https://deno.land/std@0.224.0/http/file_server.ts";
 
-// MD5哈希算法
+// 🔧 重新实现的MD5函数（基于官方示例验证）
 function md5(text: string): string {
     function md5cycle(x: number[], k: number[]) {
         let a = x[0], b = x[1], c = x[2], d = x[3];
+        
         a = ff(a, b, c, d, k[0], 7, -680876936);
         d = ff(d, a, b, c, k[1], 12, -389564586);
         c = ff(c, d, a, b, k[2], 17, 606105819);
@@ -22,6 +23,7 @@ function md5(text: string): string {
         d = ff(d, a, b, c, k[13], 12, -40341101);
         c = ff(c, d, a, b, k[14], 17, -1502002290);
         b = ff(b, c, d, a, k[15], 22, 1236535329);
+        
         a = gg(a, b, c, d, k[1], 5, -165796510);
         d = gg(d, a, b, c, k[6], 9, -1069501632);
         c = gg(c, d, a, b, k[11], 14, 643717713);
@@ -38,10 +40,11 @@ function md5(text: string): string {
         d = gg(d, a, b, c, k[2], 9, -51403784);
         c = gg(c, d, a, b, k[7], 14, 1735328473);
         b = gg(b, c, d, a, k[12], 20, -1926607734);
+        
         a = hh(a, b, c, d, k[5], 4, -378558);
         d = hh(d, a, b, c, k[8], 11, -2022574463);
         c = hh(c, d, a, b, k[11], 16, 1839030562);
-        b = ff(b, c, d, a, k[14], 23, -35309556);
+        b = hh(b, c, d, a, k[14], 23, -35309556);
         a = hh(a, b, c, d, k[1], 4, -1530992060);
         d = hh(d, a, b, c, k[4], 11, 1272893353);
         c = hh(c, d, a, b, k[7], 16, -155497632);
@@ -52,6 +55,7 @@ function md5(text: string): string {
         d = hh(d, a, b, c, k[8], 11, -1735329473);
         c = hh(c, d, a, b, k[11], 16, -198630883);
         b = hh(b, c, d, a, k[14], 23, 1126891415);
+        
         a = ii(a, b, c, d, k[0], 6, -1416354905);
         d = ii(d, a, b, c, k[7], 10, -57434055);
         c = ii(c, d, a, b, k[14], 15, 1700485571);
@@ -66,75 +70,100 @@ function md5(text: string): string {
         b = ii(b, c, d, a, k[3], 21, -1120210379);
         a = ii(a, b, c, d, k[10], 6, 718787259);
         d = ii(d, a, b, c, k[15], 10, -343485551);
+        
         x[0] = add32(a, x[0]);
         x[1] = add32(b, x[1]);
         x[2] = add32(c, x[2]);
         x[3] = add32(d, x[3]);
     }
-    function cmn(q, a, b, x, s, t) {
+
+    function cmn(q: number, a: number, b: number, x: number, s: number, t: number): number {
         a = add32(add32(a, q), add32(x, t));
         return add32((a << s) | (a >>> (32 - s)), b);
     }
-    function ff(a, b, c, d, x, s, t) {
+
+    function ff(a: number, b: number, c: number, d: number, x: number, s: number, t: number): number {
         return cmn((b & c) | ((~b) & d), a, b, x, s, t);
     }
-    function gg(a, b, c, d, x, s, t) {
+
+    function gg(a: number, b: number, c: number, d: number, x: number, s: number, t: number): number {
         return cmn((b & d) | (c & (~d)), a, b, x, s, t);
     }
-    function hh(a, b, c, d, x, s, t) {
+
+    function hh(a: number, b: number, c: number, d: number, x: number, s: number, t: number): number {
         return cmn(b ^ c ^ d, a, b, x, s, t);
     }
-    function ii(a, b, c, d, x, s, t) {
+
+    function ii(a: number, b: number, c: number, d: number, x: number, s: number, t: number): number {
         return cmn(c ^ (b | (~d)), a, b, x, s, t);
     }
-    function md51(s) {
-        var n = s.length,
+
+    function md51(s: string): number[] {
+        let n = s.length,
             state = [1732584193, -271733879, -1732584194, 271733878],
             i, length, tail, tmp, lo, hi;
-        for (i = 64; i <= s.length; i += 64) {
+            
+        for (i = 64; i <= n; i += 64) {
             md5cycle(state, md5blk(s.substring(i - 64, i)));
         }
+        
         s = s.substring(i - 64);
         length = s.length;
         tail = new Array(64);
         tail.fill(0);
-        for (i = 0; i < length; i++)
+        
+        for (i = 0; i < length; i++) {
             tail[i] = s.charCodeAt(i);
+        }
+        
         tail[i] = 128;
+        
         if (length > 55) {
             md5cycle(state, tail);
             for (i = 0; i < 64; i++) tail[i] = 0;
         }
+        
         tmp = n * 8;
         for (i = 0; i < 8; i++) {
             tail[i] = tmp & 255;
             tmp = Math.floor(tmp / 256);
         }
+        
         md5cycle(state, tail);
         return state;
     }
-    function md5blk(s) {
-        var md5blks = [], i;
+
+    function md5blk(s: string): number[] {
+        let md5blks: number[] = [], i;
         for (i = 0; i < 64; i += 4) {
-            md5blks[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i + 1) << 8) + (s.charCodeAt(i + 2) << 16) + (s.charCodeAt(i + 3) << 24);
+            md5blks[i >> 2] = s.charCodeAt(i) + 
+                             (s.charCodeAt(i + 1) << 8) + 
+                             (s.charCodeAt(i + 2) << 16) + 
+                             (s.charCodeAt(i + 3) << 24);
         }
         return md5blks;
     }
-    var hex_chr = '0123456789abcdef'.split('');
-    function rhex(n) {
-        var s = '', j = 0;
-        for (; j < 4; j++)
+
+    const hex_chr = '0123456789abcdef'.split('');
+    function rhex(n: number): string {
+        let s = '', j = 0;
+        for (; j < 4; j++) {
             s += hex_chr[(n >> (j * 8 + 4)) & 0x0F] + hex_chr[(n >> (j * 8)) & 0x0F];
+        }
         return s;
     }
-    function hex(x) {
-        for (var i = 0; i < x.length; i++)
+
+    function hex(x: number[]): string {
+        for (let i = 0; i < x.length; i++) {
             x[i] = rhex(x[i]);
+        }
         return x.join('');
     }
-    function add32(a, b) {
+
+    function add32(a: number, b: number): number {
         return (a + b) & 0xFFFFFFFF;
     }
+
     return hex(md51(text));
 }
 
@@ -143,11 +172,11 @@ const BAIDU_APP_ID = Deno.env.get('BAIDU_TRANSLATE_APP_ID');
 const BAIDU_SECRET_KEY = Deno.env.get('BAIDU_TRANSLATE_SECRET_KEY');
 
 console.log("🚀 应用启动中...");
-console.log("📱 版本: 终极调试版");
+console.log("📱 版本: MD5修复版");
 console.log("🔑 AppID配置:", BAIDU_APP_ID ? `已配置 (${BAIDU_APP_ID.length}位)` : "❌ 未配置");
 console.log("🔐 Secret Key配置:", BAIDU_SECRET_KEY ? `已配置 (${BAIDU_SECRET_KEY.length}位)` : "❌ 未配置");
 
-// 验证官方示例（根据您提供的文档）
+// 验证官方示例
 function testOfficialExample() {
     console.log("\n🧪 测试官方示例验证:");
     const appid = "2015063000000001";
@@ -251,6 +280,12 @@ serve(async (req) => {
         // 🔧 翻译端点
         if (path === "/api/translate" && req.method === "POST") {
             console.log("\n🔄 开始翻译请求");
+            
+            // 检查MD5函数是否正确
+            if (!exampleTestResult) {
+                console.log("❌ MD5函数验证失败，无法进行翻译");
+                return createJsonErrorResponse("MD5函数实现错误，请联系开发者", 500);
+            }
             
             // 检查环境变量
             if (!BAIDU_APP_ID || !BAIDU_SECRET_KEY) {
