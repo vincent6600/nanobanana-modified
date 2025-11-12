@@ -1,6 +1,6 @@
-// 百度翻译API - 基于官方文档的修复版本
+// 百度翻译API - 基于官方文档的最终修复版本
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { serveDir } from "https://deno.land/std@0.224.0/fs/mod.ts";
+import { serveDir } from "https://deno.land/std@0.224.0/http/file_server.ts";
 
 function md5(text: string): string {
     function md5cycle(x: number[], k: number[]) {
