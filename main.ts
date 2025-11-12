@@ -1,7 +1,8 @@
-// 百度翻译API - 基于官方文档的最终修复版本
+// 百度翻译API - 最终修复版本（严格按官方文档）
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { serveDir } from "https://deno.land/std@0.224.0/http/file_server.ts";
 
+// MD5哈希算法（与官方示例保持一致）
 function md5(text: string): string {
     function md5cycle(x: number[], k: number[]) {
         let a = x[0], b = x[1], c = x[2], d = x[3];
@@ -214,16 +215,21 @@ serve(async (req) => {
             const appid = Deno.env.get("BAIDU_TRANSLATE_APP_ID");
             const secret = Deno.env.get("BAIDU_TRANSLATE_SECRET_KEY");
             
-            console.log("=== 官方规范验证 ===");
-            console.log("1. AppID:", appid ? `${appid.substring(0, 4)}...${appid.substring(appid.length - 2)}` : 'null');
-            console.log("2. Secret:", secret ? `${secret.substring(0, 2)}...${secret.substring(secret.length - 2)}` : 'null');
+            console.log("🚀 === 百度翻译API调用（严格按照官方文档） ===");
+            console.log("📋 1. 环境变量检查:");
+            console.log("   AppID:", appid ? `${appid.substring(0, 4)}...${appid.substring(appid.length - 2)}` : '❌ 未设置');
+            console.log("   Secret:", secret ? `${secret.substring(0, 2)}...${secret.substring(secret.length - 2)}` : '❌ 未设置');
+            console.log("📝 2. 翻译文本:");
+            console.log("   内容:", text);
+            console.log("   长度:", text.length, "字符");
+            console.log("   编码:", "UTF-8");
             
             if (!appid || !secret) {
-                console.error("❌ 百度翻译API环境变量未正确设置");
+                console.error("❌ 环境变量未设置");
                 return createJsonErrorResponse("翻译服务配置错误", 500);
             }
 
-            // 语言检测和翻译方向判断
+            // 🔧 语言检测（与原逻辑保持一致）
             const hasChinese = /[\u4e00-\u9fa5]/.test(text);
             const hasEnglish = /[a-zA-Z]/.test(text);
             let to_lang = 'en';
@@ -236,114 +242,121 @@ serve(async (req) => {
                 to_lang = 'en'; // 混合文本翻译成英文
             }
 
-            // 🔧 官方建议：使用更简单的盐值格式（避免复杂随机数）
-            const salt = Math.floor(Math.random() * 100000).toString(); // 6位随机数
-            
-            // ✅ 官方规范：签名生成（q参数不进行URL encode）
+            // 🔧 使用官方推荐的盐值格式
+            const salt = Date.now().toString();
+            console.log("🧂 3. 盐值:", salt, "(时间戳格式)");
+
+            // ✅ 严格按照官方文档：签名前q参数不进行URL encode
             const signString = appid + text + salt + secret;
             const sign = md5(signString);
             
-            console.log("=== 签名生成（官方规范） ===");
-            console.log("1. 签名字符串:", signString.replace(secret, '***SECRET***'));
-            console.log("2. 生成签名:", sign);
-            console.log("3. 盐值长度:", salt.length);
+            console.log("🔐 4. 签名生成（严格按照官方文档）:");
+            console.log("   签名字符串:", signString.replace(secret, '***SECRET***'));
+            console.log("   签名值:", sign);
+            console.log("   签名长度:", sign.length, "(应为32位)");
 
-            // ✅ 官方规范：构建请求参数
-            // 注意：这里会使用URLSearchParams自动进行URL encode
-            const params = new URLSearchParams();
-            params.append('q', text);           // URLSearchParams会自动对q进行URL encode
-            params.append('from', 'auto');
-            params.append('to', to_lang);
-            params.append('appid', appid);
-            params.append('salt', salt);
-            params.append('sign', sign);
+            // ✅ 构建请求参数（URLSearchParams会自动处理URL encode）
+            const requestBody = new URLSearchParams();
+            requestBody.append('q', text);           // URLSearchParams会对q进行URL encode
+            requestBody.append('from', 'auto');
+            requestBody.append('to', to_lang);
+            requestBody.append('appid', appid);
+            requestBody.append('salt', salt);
+            requestBody.append('sign', sign);
+            
+            const encodedBody = requestBody.toString();
+            console.log("📡 5. HTTP请求信息:");
+            console.log("   方法: POST");
+            console.log("   Content-Type: application/x-www-form-urlencoded");
+            console.log("   请求体:", encodedBody.replace(secret, '***SECRET***').replace(appid, '***APPID***'));
 
-            console.log("=== 请求参数（URL encode后） ===");
-            console.log("1. 请求体:", params.toString().replace(secret, '***SECRET***').replace(appid, '***APPID***'));
-
-            // ✅ 官方规范：POST请求
+            // ✅ 发送API请求
             const response = await fetch("https://fanyi-api.baidu.com/api/trans/vip/translate", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": "BaiduTranslate/1.0"
+                    "Content-Type": "application/x-www-form-urlencoded"
                 },
-                body: params.toString()
+                body: encodedBody
             });
 
-            console.log("=== API响应 ===");
-            console.log("状态码:", response.status);
+            console.log("📬 6. API响应:");
+            console.log("   状态码:", response.status);
+            console.log("   状态文本:", response.statusText);
 
             if (!response.ok) {
-                console.error("❌ API响应错误:", response.status, response.statusText);
-                return createJsonErrorResponse(`翻译服务错误: ${response.status}`, 500);
+                console.error("❌ API请求失败:", response.status, response.statusText);
+                return createJsonErrorResponse(`翻译服务网络错误: ${response.status}`, 500);
             }
 
             const result = await response.json();
-            console.log("响应内容:", JSON.stringify(result, null, 2));
+            console.log("📄 完整响应:", JSON.stringify(result, null, 2));
 
-            // 检查百度API返回的错误
+            // 🚨 检查百度API返回的错误
             if (result.error_code) {
-                console.log("❌ 检测到百度API错误:", result.error_code, result.error_msg);
+                console.log("❌ 百度API返回错误:", {
+                    error_code: result.error_code,
+                    error_msg: result.error_msg
+                });
+                
                 let errorMessage = "翻译服务错误";
                 switch (result.error_code) {
                     case '54001':
-                        errorMessage = "翻译服务签名错误";
-                        console.log("❌ 54001错误详情:", {
+                        errorMessage = "54001签名错误";
+                        console.log("🔍 54001错误诊断:", {
                             signStringPreview: signString.replace(secret, '***SECRET***'),
                             sign: sign,
-                            appid: appid,
-                            salt: salt,
                             textLength: text.length,
-                            timestamp: new Date().toISOString()
+                            salt: salt,
+                            timestamp: new Date().toISOString(),
+                            note: "请检查签名前是否对q参数进行了URL encode"
                         });
                         break;
                     case '52003':
-                        errorMessage = "翻译服务认证失败，请检查API配置";
+                        errorMessage = "API认证失败，请检查APP ID和密钥";
                         break;
                     case '54003':
-                        errorMessage = "翻译服务请求频率限制";
+                        errorMessage = "请求频率限制";
                         break;
                     case '54004':
-                        errorMessage = "翻译服务账户余额不足";
+                        errorMessage = "账户余额不足";
                         break;
                     default:
-                        errorMessage = `翻译服务错误 (错误代码: ${result.error_code}, 错误信息: ${result.error_msg || '未知错误'})`;
+                        errorMessage = `未知错误 (${result.error_code}: ${result.error_msg || '未知消息'})`;
                 }
                 return createJsonErrorResponse(errorMessage, 500);
             }
 
-            // 提取翻译结果
+            // ✅ 提取翻译结果
             if (result.trans_result && result.trans_result.length > 0) {
                 const translatedText = result.trans_result[0].dst;
-                console.log("✅ 翻译成功:", {
-                    original: text,
-                    translated: translatedText,
-                    from: result.from,
-                    to: result.to
+                console.log("✅ 翻译成功!", {
+                    原文: text,
+                    译文: translatedText,
+                    源语言: result.from,
+                    目标语言: result.to
                 });
                 
                 return new Response(JSON.stringify({ 
                     translated: translatedText,
                     original: text,
                     from: result.from,
-                    to: result.to
+                    to: result.to,
+                    timestamp: new Date().toISOString()
                 }), {
                     headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
                 });
             } else {
-                console.error("❌ 翻译服务返回无效响应:", result);
+                console.error("❌ API返回无效响应:", result);
                 return createJsonErrorResponse("翻译服务返回无效响应", 500);
             }
 
         } catch (error) {
-            console.error("❌ 翻译服务处理错误:", error);
-            return createJsonErrorResponse("翻译服务网络错误，请检查网络连接", 500);
+            console.error("❌ 翻译服务异常:", error);
+            return createJsonErrorResponse("翻译服务网络错误", 500);
         }
     }
 
     if (pathname === "/generate") {
-        // 这里保持原有的generate功能
         return createJsonErrorResponse("Generate endpoint temporarily disabled", 501);
     }
 
