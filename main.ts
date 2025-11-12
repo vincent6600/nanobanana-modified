@@ -1,245 +1,361 @@
-// --- START OF FILE main.ts ---
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { serveDir } from "https://deno.land/std@0.224.0/http/file_server.ts";
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-// --- 辅助函数：创建 JSON 错误响应 ---
-function createJsonErrorResponse(message: string, statusCode = 500) {
-    return new Response(JSON.stringify({ error: message }), {
-        status: statusCode,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-    });
+interface GenerateRequest {
+  model: string;
+  prompt?: string;
+  negativePrompt?: string;
+  width?: number;
+  height?: number;
+  steps?: number;
+  guidanceScale?: number;
+  seed?: number;
+  stylePreset?: string;
+  aspectRatio?: string;
 }
 
-// --- 辅助函数：休眠/等待 ---
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-// =======================================================
-// 模块 1: OpenRouter API 调用逻辑 (用于 nano banana)
-// =======================================================
-async function callOpenRouter(messages: any[], apiKey: string): Promise<{ type: 'image' | 'text'; content: string }> {
-    if (!apiKey) { throw new Error("callOpenRouter received an empty apiKey."); }
-    const openrouterPayload = { model: "google/gemini-2.5-flash-image-preview", messages };
-    console.log("Sending payload to OpenRouter:", JSON.stringify(openrouterPayload, null, 2));
-    const apiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST", headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify(openrouterPayload)
-    });
-    if (!apiResponse.ok) {
-        const errorBody = await apiResponse.text();
-        throw new Error(`OpenRouter API error: ${apiResponse.status} ${apiResponse.statusText} - ${errorBody}`);
-    }
-    const responseData = await apiResponse.json();
-    console.log("OpenRouter Response:", JSON.stringify(responseData, null, 2));
-    const message = responseData.choices?.[0]?.message;
-    if (message?.images?.[0]?.image_url?.url) { return { type: 'image', content: message.images[0].image_url.url }; }
-    if (typeof message?.content === 'string' && message.content.startsWith('data:image/')) { return { type: 'image', content: message.content }; }
-    if (typeof message?.content === 'string' && message.content.trim() !== '') { return { type: 'text', content: message.content }; }
-    return { type: 'text', content: "[模型没有返回有效内容]" };
+// Language detection function
+function detectLanguage(text: string): string {
+  const chineseRegex = /[\u4e00-\u9fa5]/;
+  const englishRegex = /[a-zA-Z]/;
+  const hasChinese = chineseRegex.test(text);
+  const hasEnglish = englishRegex.test(text);
+  
+  if (hasChinese && hasEnglish) return 'zh'; // Mixed → English
+  if (hasChinese) return 'zh'; // Chinese → English
+  return 'en'; // English → Chinese
 }
 
-// =======================================================
-// 模块 1.5: OpenRouter GPT-5 Image API 调用逻辑 (用于 ChatGPT)
-// =======================================================
-async function callDALLE3(prompt: string, apiKey: string, images: string[] = []): Promise<{ type: 'image' | 'text'; content: string }> {
-    if (!apiKey) { throw new Error("callDALLE3 received an empty apiKey."); }
-    
-    // 构建请求体 - 使用OpenRouter上实际可用的GPT-5 Image模型
-    const requestBody: any = {
-        model: "openai/gpt-5-image-mini",  // 使用Mini版本，成本较低
-        prompt: prompt,
-        n: 1
-    };
+// Baidu Translate API integration
+async function translateWithBaidu(text: string, targetLang: string = 'en') {
+  const appId = Deno.env.get('BAIDU_TRANSLATE_APP_ID');
+  const secretKey = Deno.env.get('BAIDU_TRANSLATE_SECRET_KEY');
+  
+  if (!appId || !secretKey) {
+    throw new Error('百度翻译API配置错误');
+  }
 
-    // 处理图片上传
-    const contentPayload: any[] = [{ type: "text", text: prompt }];
-    if (images && images.length > 0) {
-        const imageParts = images.map(img => ({ type: "image_url", image_url: { url: img } }));
-        contentPayload.push(...imageParts);
-    }
+  // Generate MD5 signature
+  const salt = Math.random().toString(36).slice(-8);
+  const query = text;
+  const sign = await generateMD5(appId + query + salt + secretKey);
 
-    // 构建OpenRouter API格式的消息
-    const webUiMessages = [{ role: "user", content: contentPayload }];
+  const params = new URLSearchParams({
+    q: query,
+    from: 'auto',
+    to: targetLang === 'zh' ? 'zh' : 'en',
+    appid: appId,
+    salt: salt,
+    sign: sign
+  });
+
+  try {
+    const response = await fetch('https://api.fanyi.baidu.com/api/trans/vip/translate?' + params.toString());
     
-    console.log("Sending GPT-5 Image request to OpenRouter:", JSON.stringify({ model: requestBody.model, messages: webUiMessages }, null, 2));
-    
-    const apiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST", 
-        headers: { 
-            "Authorization": `Bearer ${apiKey}`, 
-            "Content-Type": "application/json" 
-        },
-        body: JSON.stringify({ model: requestBody.model, messages: webUiMessages })
-    });
-    
-    if (!apiResponse.ok) {
-        const errorBody = await apiResponse.text();
-        throw new Error(`OpenRouter GPT-5 Image API error: ${apiResponse.status} ${apiResponse.statusText} - ${errorBody}`);
+    if (!response.ok) {
+      throw new Error(`网络错误: ${response.status}`);
     }
     
-    const responseData = await apiResponse.json();
-    console.log("OpenRouter GPT-5 Image Response:", JSON.stringify(responseData, null, 2));
+    const data = await response.json();
     
-    const message = responseData.choices?.[0]?.message;
-    if (message?.images?.[0]?.image_url?.url) { 
-        return { type: 'image', content: message.images[0].image_url.url }; 
-    }
-    if (typeof message?.content === 'string' && message.content.startsWith('data:image/')) { 
-        return { type: 'image', content: message.content }; 
-    }
-    if (typeof message?.content === 'string' && message.content.trim() !== '') { 
-        return { type: 'text', content: message.content }; 
+    if (data.error_code) {
+      throw new Error(`翻译失败: ${data.error_msg || '未知错误'}`);
     }
     
-    return { type: 'text', content: "[模型没有返回有效内容]" };
+    return data.trans_result[0].dst;
+  } catch (error) {
+    throw new Error(`网络连接失败，请检查网络设置`);
+  }
 }
 
-// =======================================================
-// 模块 2: ModelScope API 调用逻辑 (用于 Qwen-Image 等)
-// =======================================================
-// [修改] 函数接收一个 timeoutSeconds 参数
-async function callModelScope(model: string, apikey: string, parameters: any, timeoutSeconds: number): Promise<{ imageUrl: string }> {
-    const base_url = 'https://api-inference.modelscope.cn/';
-    const common_headers = {
-        "Authorization": `Bearer ${apikey}`,
-        "Content-Type": "application/json",
-    };
-    console.log(`[ModelScope] Submitting task for model: ${model}`);
-    const generationResponse = await fetch(`${base_url}v1/images/generations`, {
-        method: "POST",
-        headers: { ...common_headers, "X-ModelScope-Async-Mode": "true" },
-        body: JSON.stringify({ model, ...parameters }),
-    });
-    if (!generationResponse.ok) {
-        const errorBody = await generationResponse.text();
-        throw new Error(`ModelScope API Error (Generation): ${generationResponse.status} - ${errorBody}`);
-    }
-    const { task_id } = await generationResponse.json();
-    if (!task_id) { throw new Error("ModelScope API did not return a task_id."); }
-    console.log(`[ModelScope] Task submitted. Task ID: ${task_id}`);
-    
-    // [修改] 动态计算最大轮询次数
-    const pollingIntervalSeconds = 5;
-    const maxRetries = Math.ceil(timeoutSeconds / pollingIntervalSeconds);
-    console.log(`[ModelScope] Task timeout set to ${timeoutSeconds}s, polling a max of ${maxRetries} times.`);
-
-    for (let i = 0; i < maxRetries; i++) {
-        await sleep(pollingIntervalSeconds * 1000); // 使用变量
-        console.log(`[ModelScope] Polling task status... Attempt ${i + 1}/${maxRetries}`);
-        const statusResponse = await fetch(`${base_url}v1/tasks/${task_id}`, { headers: { ...common_headers, "X-ModelScope-Task-Type": "image_generation" } });
-        if (!statusResponse.ok) {
-            console.error(`[ModelScope] Failed to get task status. Status: ${statusResponse.status}`);
-            continue;
-        }
-        const data = await statusResponse.json();
-        if (data.task_status === "SUCCEED") {
-            console.log("[ModelScope] Task Succeeded.");
-            if (data.output?.images?.[0]?.url) {
-                return { imageUrl: data.output.images[0].url };
-            } else if (data.output_images?.[0]) {
-                return { imageUrl: data.output_images[0] };
-            } else {
-                throw new Error("ModelScope task succeeded but returned no images.");
-            }
-        } else if (data.task_status === "FAILED") {
-            console.error("[ModelScope] Task Failed.", data);
-            throw new Error(`ModelScope task failed: ${data.message || 'Unknown error'}`);
-        }
-    }
-    throw new Error(`ModelScope task timed out after ${timeoutSeconds} seconds.`);
+// MD5 generation function
+async function generateMD5(str: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest('MD5', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
 }
 
-// =======================================================
-// 主服务逻辑
-// =======================================================
 serve(async (req) => {
-    const pathname = new URL(req.url).pathname;
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const url = new URL(req.url);
     
-    if (req.method === 'OPTIONS') { 
-        return new Response(null, { 
-            status: 204, 
-            headers: { 
-                "Access-Control-Allow-Origin": "*", 
-                "Access-Control-Allow-Methods": "POST, GET, OPTIONS", 
-                "Access-Control-Allow-Headers": "Content-Type, Authorization" 
-            } 
-        }); 
-    }
-
-    if (pathname === "/api/key-status") {
-        const isSet = !!Deno.env.get("OPENROUTER_API_KEY");
-        return new Response(JSON.stringify({ isSet }), {
-            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    // Translate API endpoint
+    if (url.pathname === '/api/translate') {
+      if (req.method !== 'POST') {
+        return new Response(JSON.stringify({ error: '只支持POST请求' }), {
+          status: 405,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
-    }
+      }
 
-    if (pathname === "/api/openai-key-status") {
-        const isSet = !!Deno.env.get("OPENAI_API_KEY");
-        return new Response(JSON.stringify({ isSet }), {
-            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      const { text, targetLang = 'auto' } = await req.json();
+      
+      if (!text || text.trim() === '') {
+        return new Response(JSON.stringify({ error: '文本不能为空' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
-    }
+      }
 
-    if (pathname === "/api/modelscope-key-status") {
-        const isSet = !!Deno.env.get("MODELSCOPE_API_KEY");
-        return new Response(JSON.stringify({ isSet }), {
-            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      const detectedLang = detectLanguage(text);
+      const targetLanguage = targetLang === 'auto' ? (detectedLang === 'zh' ? 'en' : 'zh') : targetLang;
+
+      try {
+        const translatedText = await translateWithBaidu(text, targetLanguage);
+        
+        return new Response(JSON.stringify({ 
+          translatedText,
+          detectedLanguage: detectedLang,
+          targetLanguage: targetLanguage
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      } catch (error) {
+        return new Response(JSON.stringify({ 
+          error: error.message 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
-    if (pathname === "/generate") {
-        try {
-            // [修改] 从请求体中解构出 timeout
-            const requestData = await req.json();
-            const { model, apikey, prompt, images, parameters, timeout } = requestData;
+    if (url.pathname === '/api/generate' && req.method === 'POST') {
+      const requestData: GenerateRequest = await req.json();
+      const { model } = requestData;
 
-            if (model === 'nanobanana') {
-                const openrouterApiKey = apikey || Deno.env.get("OPENROUTER_API_KEY");
-                if (!openrouterApiKey) { return createJsonErrorResponse("OpenRouter API key is not set.", 500); }
-                if (!prompt) { return createJsonErrorResponse("Prompt is required.", 400); }
-                const contentPayload: any[] = [{ type: "text", text: prompt }];
-                if (images && Array.isArray(images) && images.length > 0) {
-                    const imageParts = images.map(img => ({ type: "image_url", image_url: { url: img } }));
-                    contentPayload.push(...imageParts);
-                }
-                const webUiMessages = [{ role: "user", content: contentPayload }];
-                const result = await callOpenRouter(webUiMessages, openrouterApiKey);
-                if (result.type === 'image') {
-                    return new Response(JSON.stringify({ imageUrl: result.content }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
-                } else {
-                    return createJsonErrorResponse(`Model returned text instead of an image: "${result.content}"`, 400);
-                }
-            } else if (model === 'chatgpt') {
-                const openaiApiKey = apikey || Deno.env.get("OPENAI_API_KEY");
-                if (!openaiApiKey) { return createJsonErrorResponse("OpenAI API key is not set.", 500); }
-                if (!prompt) { return createJsonErrorResponse("Prompt is required.", 400); }
-                
-                // 直接传递prompt和images到GPT-5 Image函数
-                const result = await callDALLE3(prompt, openaiApiKey, images || []);
-                if (result.type === 'image') {
-                    return new Response(JSON.stringify({ imageUrl: result.content }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
-                } else {
-                    return createJsonErrorResponse(`Model returned text instead of an image: "${result.content}"`, 400);
-                }
-            } else {
-                const modelscopeApiKey = apikey || Deno.env.get("MODELSCOPE_API_KEY");
-                if (!modelscopeApiKey) { return createJsonErrorResponse("ModelScope API key is not set.", 401); }
-                if (!parameters?.prompt) { return createJsonErrorResponse("Positive prompt is required for ModelScope models.", 400); }
-                
-                // [修改] 将 timeout (或默认值) 传递给 callModelScope
-                // Qwen 默认2分钟，其他默认3分钟
-                const timeoutSeconds = timeout || (model.includes('Qwen') ? 120 : 180); 
-                const result = await callModelScope(model, modelscopeApiKey, parameters, timeoutSeconds);
+      let response;
+      
+      switch (model) {
+        case 'chatgpt-5':
+          response = await generateChatGPT(requestData);
+          break;
+        case 'nanobanana':
+          response = await generateNanoBanana(requestData);
+          break;
+        case 'qwen-image':
+          response = await generateQwenImage(requestData);
+          break;
+        default:
+          response = { error: '不支持的模型' };
+      }
 
-                return new Response(JSON.stringify(result), {
-                    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-                });
-            }
-        } catch (error) {
-            console.error("Error handling /generate request:", error);
-            return createJsonErrorResponse(error.message, 500);
-        }
+      return new Response(JSON.stringify(response), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    return serveDir(req, { fsRoot: "static", urlRoot: "", showDirListing: true, enableCors: true });
+    return new Response('Not Found', { status: 404 });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 });
+
+async function generateChatGPT(request: GenerateRequest) {
+  const apiKey = Deno.env.get('OPENROUTER_API_KEY');
+  if (!apiKey) {
+    return { error: 'OpenRouter API密钥未配置' };
+  }
+
+  try {
+    // Generate image using Flux.1 model via OpenRouter
+    const prompt = request.prompt || '';
+    const negativePrompt = request.negativePrompt || '';
+    
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://nanobanana-ai.replit.app',
+        'X-Title': 'NanoBanana AI',
+      },
+      body: JSON.stringify({
+        model: 'black-forest-labs/flux-1.1-pro',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: prompt
+              },
+              {
+                type: 'text',
+                text: negativePrompt ? `Negative prompt: ${negativePrompt}` : ''
+              }
+            ]
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.8,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return { error: `API请求失败: ${errorData.error?.message || '未知错误'}` };
+    }
+
+    const data = await response.json();
+    
+    if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+      const content = data.choices[0].message.content;
+      const imageMatch = content.match(/https:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp)/i);
+      
+      if (imageMatch) {
+        return { 
+          success: true, 
+          imageUrl: imageMatch[0],
+          model: 'chatgpt-5',
+          prompt: prompt
+        };
+      } else {
+        return { error: 'API返回的图片URL格式不正确' };
+      }
+    } else {
+      return { error: 'API响应格式异常' };
+    }
+  } catch (error) {
+    return { error: `网络连接失败: ${error.message}` };
+  }
+}
+
+async function generateNanoBanana(request: GenerateRequest) {
+  try {
+    const prompt = request.prompt || '';
+    const negativePrompt = request.negativePrompt || '';
+    
+    const width = request.width || 1024;
+    const height = request.height || 1024;
+    const steps = request.steps || 50;
+    const guidanceScale = request.guidanceScale || 7.5;
+    
+    const seed = request.seed && request.seed > 0 ? request.seed : Math.floor(Math.random() * 1000000);
+    
+    const formData = new FormData();
+    formData.append('prompt', prompt);
+    formData.append('negative_prompt', negativePrompt);
+    formData.append('width', width.toString());
+    formData.append('height', height.toString());
+    formData.append('steps', steps.toString());
+    formData.append('guidance_scale', guidanceScale.toString());
+    formData.append('seed', seed.toString());
+
+    const response = await fetch('https://nanobanana.com/generate', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('NanoBanana API Error:', response.status, errorText);
+      return { error: `API请求失败: ${response.status}` };
+    }
+
+    const data = await response.json();
+    
+    if (data.images && data.images.length > 0) {
+      return {
+        success: true,
+        imageUrl: data.images[0],
+        model: 'nanobanana',
+        prompt: prompt,
+        seed: seed
+      };
+    } else {
+      return { error: 'API返回异常: 未找到图片数据' };
+    }
+  } catch (error) {
+    return { error: `网络连接失败: ${error.message}` };
+  }
+}
+
+async function generateQwenImage(request: GenerateRequest) {
+  try {
+    const apiKey = Deno.env.get('MODELSCOPE_API_KEY');
+    if (!apiKey) {
+      return { error: 'ModelScope API密钥未配置' };
+    }
+
+    const prompt = request.prompt || '';
+    const negativePrompt = request.negativePrompt || '';
+    
+    const width = request.width || 1024;
+    const height = request.height || 1024;
+    const aspectRatio = request.aspectRatio || '1:1';
+    
+    const payload = {
+      model: "AI-ModelScope/stable-diffusion-xl-base-1.0",
+      input: {
+        prompt: prompt,
+        negative_prompt: negativePrompt,
+        image: "",
+        width: width,
+        height: height,
+        num_inference_steps: 50,
+        guidance_scale: 7.5,
+        seed: 42
+      },
+      parameters: {
+        style: "<sketch>"
+      }
+    };
+
+    const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'X-DashScope-SSE': 'disable'
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Qwen API Error:', response.status, errorData);
+      return { error: `API请求失败: ${errorData.code || '未知错误'}` };
+    }
+
+    const data = await response.json();
+    
+    if (data.output && data.output.results && data.output.results.length > 0) {
+      return {
+        success: true,
+        imageUrl: data.output.results[0].url,
+        model: 'qwen-image',
+        prompt: prompt
+      };
+    } else if (data.base64_image) {
+      // Handle base64 response
+      return {
+        success: true,
+        imageUrl: `data:image/png;base64,${data.base64_image}`,
+        model: 'qwen-image',
+        prompt: prompt
+      };
+    } else {
+      console.error('Unexpected API response:', data);
+      return { error: 'API返回异常: 未知格式' };
+    }
+  } catch (error) {
+    console.error('Qwen API Network Error:', error);
+    return { error: `网络连接失败: ${error.message}` };
+  }
+}
