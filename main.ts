@@ -5,185 +5,167 @@ import { serveDir } from "https://deno.land/std@0.224.0/http/file_server.ts";
 
 // --- MD5 哈希算法实现 (用于百度翻译API签名) ---
 function md5(text: string): string {
-    function toHex(buffer: ArrayBuffer): string {
-        const bytes = new Uint8Array(buffer);
-        return Array.from(bytes)
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
+    // 使用标准的MD5算法实现
+    function md5cycle(x: number[], k: number[]) {
+        let a = x[0], b = x[1], c = x[2], d = x[3];
+
+        a = ff(a, b, c, d, k[0], 7, -680876936);
+        d = ff(d, a, b, c, k[1], 12, -389564586);
+        c = ff(c, d, a, b, k[2], 17, 606105819);
+        b = ff(b, c, d, a, k[3], 22, -1044525330);
+        a = ff(a, b, c, d, k[4], 7, -176418897);
+        d = ff(d, a, b, c, k[5], 12, 1200080426);
+        c = ff(c, d, a, b, k[6], 17, -1473231341);
+        b = ff(b, c, d, a, k[7], 22, -45705983);
+        a = ff(a, b, c, d, k[8], 7, 1770035416);
+        d = ff(d, a, b, c, k[9], 12, -1958414417);
+        c = ff(c, d, a, b, k[10], 17, -42063);
+        b = ff(b, c, d, a, k[11], 22, -1990404162);
+        a = ff(a, b, c, d, k[12], 7, 1804603682);
+        d = ff(d, a, b, c, k[13], 12, -40341101);
+        c = ff(c, d, a, b, k[14], 17, -1502002290);
+        b = ff(b, c, d, a, k[15], 22, 1236535329);
+
+        a = gg(a, b, c, d, k[1], 5, -165796510);
+        d = gg(d, a, b, c, k[6], 9, -1069501632);
+        c = gg(c, d, a, b, k[11], 14, 643717713);
+        b = gg(b, c, d, a, k[0], 20, -373897302);
+        a = gg(a, b, c, d, k[5], 5, -701558691);
+        d = gg(d, a, b, c, k[10], 9, 38016083);
+        c = gg(c, d, a, b, k[15], 14, -660478335);
+        b = gg(b, c, d, a, k[4], 20, -405537848);
+        a = gg(a, b, c, d, k[9], 5, 568446438);
+        d = gg(d, a, b, c, k[14], 9, -1019803690);
+        c = gg(c, d, a, b, k[3], 14, -187363961);
+        b = gg(b, c, d, a, k[8], 20, 1163531501);
+        a = gg(a, b, c, d, k[13], 5, -1444681467);
+        d = gg(d, a, b, c, k[2], 9, -51403784);
+        c = gg(c, d, a, b, k[7], 14, 1735328473);
+        b = gg(b, c, d, a, k[12], 20, -1926607734);
+
+        a = hh(a, b, c, d, k[5], 4, -378558);
+        d = hh(d, a, b, c, k[8], 11, -2022574463);
+        c = hh(c, d, a, b, k[11], 16, 1839030562);
+        b = hh(b, c, d, a, k[14], 23, -35309556);
+        a = hh(a, b, c, d, k[1], 4, -1530992060);
+        d = hh(d, a, b, c, k[4], 11, 1272893353);
+        c = hh(c, d, a, b, k[7], 16, -155497632);
+        b = hh(b, c, d, a, k[10], 23, -1094730640);
+        a = hh(a, b, c, d, k[13], 4, 681279174);
+        d = hh(d, a, b, c, k[0], 11, -358537222);
+        c = hh(c, d, a, b, k[3], 16, -722521979);
+        b = hh(b, c, d, a, k[6], 23, 76029189);
+        a = hh(a, b, c, d, k[9], 4, -640364487);
+        d = hh(d, a, b, c, k[12], 11, -421815835);
+        c = hh(c, d, a, b, k[15], 16, 530742520);
+        b = hh(b, c, d, a, k[2], 23, -995338651);
+
+        a = ii(a, b, c, d, k[0], 6, -198630844);
+        d = ii(d, a, b, c, k[7], 10, 1126891415);
+        c = ii(c, d, a, b, k[14], 15, -1416354905);
+        b = ii(b, c, d, a, k[5], 21, -57434055);
+        a = ii(a, b, c, d, k[12], 6, 1700485571);
+        d = ii(d, a, b, c, k[3], 10, -1894986606);
+        c = ii(c, d, a, b, k[10], 15, -1051523);
+        b = ii(b, c, d, a, k[1], 21, -2054922799);
+        a = ii(a, b, c, d, k[8], 6, 1873313359);
+        d = ii(d, a, b, c, k[15], 10, -30611744);
+        c = ii(c, d, a, b, k[6], 15, -1560198380);
+        b = ii(b, c, d, a, k[13], 21, 1309151649);
+        a = ii(a, b, c, d, k[4], 6, -145523070);
+        d = ii(d, a, b, c, k[11], 10, -1120210379);
+        c = ii(c, d, a, b, k[2], 15, 718787259);
+        b = ii(b, c, d, a, k[9], 21, -343485551);
+
+        x[0] = add32(a, x[0]);
+        x[1] = add32(b, x[1]);
+        x[2] = add32(c, x[2]);
+        x[3] = add32(d, x[3]);
     }
-    
-    function rotateLeft(value: number, amount: number): number {
-        return (value << amount) | (value >>> (32 - amount));
+
+    function cmn(q: number, a: number, b: number, x: number, s: number, t: number) {
+        a = add32(add32(a, q), add32(x, t));
+        return add32((a << s) | (a >>> (32 - s)), b);
     }
-    
-    function addUnsigned(x: number, y: number): number {
-        const lsw = (x & 0xFFFF) + (y & 0xFFFF);
-        const msw = (x >> 16) + (y >> 16) + (lsw >> 16);
-        return (msw << 16) | (lsw & 0xFFFF);
+
+    function ff(a: number, b: number, c: number, d: number, x: number, s: number, t: number) {
+        return cmn((b & c) | ((~b) & d), a, b, x, s, t);
     }
-    
-    function F(x: number, y: number, z: number): number {
-        return (x & y) | ((~x) & z);
+
+    function gg(a: number, b: number, c: number, d: number, x: number, s: number, t: number) {
+        return cmn((b & d) | (c & (~d)), a, b, x, s, t);
     }
-    
-    function G(x: number, y: number, z: number): number {
-        return (x & z) | (y & (~z));
+
+    function hh(a: number, b: number, c: number, d: number, x: number, s: number, t: number) {
+        return cmn(b ^ c ^ d, a, b, x, s, t);
     }
-    
-    function H(x: number, y: number, z: number): number {
-        return x ^ y ^ z;
+
+    function ii(a: number, b: number, c: number, d: number, x: number, s: number, t: number) {
+        return cmn(c ^ (b | (~d)), a, b, x, s, t);
     }
-    
-    function I(x: number, y: number, z: number): number {
-        return y ^ (x | (~z));
-    }
-    
-    function FF(a: number, b: number, c: number, d: number, x: number, s: number, ac: number): number {
-        a = addUnsigned(a, addUnsigned(addUnsigned(F(b, c, d), x), ac));
-        return addUnsigned(rotateLeft(a, s), b);
-    }
-    
-    function GG(a: number, b: number, c: number, d: number, x: number, s: number, ac: number): number {
-        a = addUnsigned(a, addUnsigned(addUnsigned(G(b, c, d), x), ac));
-        return addUnsigned(rotateLeft(a, s), b);
-    }
-    
-    function HH(a: number, b: number, c: number, d: number, x: number, s: number, ac: number): number {
-        a = addUnsigned(a, addUnsigned(addUnsigned(H(b, c, d), x), ac));
-        return addUnsigned(rotateLeft(a, s), b);
-    }
-    
-    function II(a: number, b: number, c: number, d: number, x: number, s: number, ac: number): number {
-        a = addUnsigned(a, addUnsigned(addUnsigned(I(b, c, d), x), ac));
-        return addUnsigned(rotateLeft(a, s), b);
-    }
-    
-    function convertToWordArray(string: string): number[] {
-        let lWordCount = 0;
-        const lMessageLength = string.length;
-        const lNumberOfWords_temp1 = lMessageLength + 8;
-        const lNumberOfWords_temp2 = (lNumberOfWords_temp1 - (lNumberOfWords_temp1 % 64)) / 64;
-        const lNumberOfWords = (lNumberOfWords_temp2 + 1) * 16;
-        const lWordArray: number[] = new Array(lNumberOfWords - 1);
-        
-        let lBytePosition = 0;
-        let lByteCount = 0;
-        
-        while (lByteCount < lMessageLength) {
-            lWordCount = (lByteCount - (lByteCount % 4)) / 4;
-            lBytePosition = (lByteCount % 4) * 8;
-            lWordArray[lWordCount] = (lWordArray[lWordCount] | (string.charCodeAt(lByteCount) << lBytePosition));
-            lByteCount++;
+
+    function md51(s: string) {
+        const n = s.length;
+        const state = [1732584193, -271733879, -1732584194, 271733878];
+        let i, length, tail, tmp, lo, hi;
+
+        for (i = 64; i <= s.length; i += 64) {
+            md5cycle(state, md5blk(s.substring(i - 64, i)));
         }
-        
-        lWordCount = (lByteCount - (lByteCount % 4)) / 4;
-        lBytePosition = (lByteCount % 4) * 8;
-        lWordArray[lWordCount] = lWordArray[lWordCount] | (0x80 << lBytePosition);
-        lWordArray[lNumberOfWords - 2] = lMessageLength << 3;
-        lWordArray[lNumberOfWords - 1] = lMessageLength >>> 29;
-        
-        return lWordArray;
-    }
-    
-    function wordToHex(lValue: number): string {
-        let WordToHexValue = "", WordToHexValue_temp = "", lByte, lCount;
-        
-        for (lCount = 0; lCount <= 3; lCount++) {
-            lByte = (lValue >>> (lCount * 8)) & 255;
-            WordToHexValue_temp = "0" + lByte.toString(16);
-            WordToHexValue = WordToHexValue + WordToHexValue_temp.substr(WordToHexValue_temp.length - 2, 2);
+
+        s = s.substring(i - 64);
+        length = s.length;
+        tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+        for (i = 0; i < length; i++) {
+            tail[i >> 2] |= s.charCodeAt(i) << ((i % 4) << 3);
         }
-        
-        return WordToHexValue;
+
+        tail[i >> 2] |= 0x80 << ((i % 4) << 3);
+        if (i > 55) {
+            md5cycle(state, tail);
+            for (i = 0; i < 16; i++) tail[i] = 0;
+        }
+
+        // Append length in bits
+        tmp = n * 8;
+        tail[14] = tmp & 0xFFFFFFFF;
+        tail[15] = Math.floor(tmp / 0x100000000);
+        md5cycle(state, tail);
+
+        return state;
     }
-    
-    const x = convertToWordArray(text);
-    let a = 0x67452301;
-    let b = 0xEFCDAB89;
-    let c = 0x98BADCFE;
-    let d = 0x10325476;
-    
-    for (let k = 0; k < x.length; k += 16) {
-        const AA = a;
-        const BB = b;
-        const CC = c;
-        const DD = d;
-        
-        a = FF(a, b, c, d, x[k + 0], 7, 0xD76AA478);
-        d = FF(d, a, b, c, x[k + 1], 12, 0xE8C7B756);
-        c = FF(c, d, a, b, x[k + 2], 17, 0x242070DB);
-        b = FF(b, c, d, a, x[k + 3], 22, 0xC1BDCEEE);
-        a = FF(a, b, c, d, x[k + 4], 7, 0xF57C0FAF);
-        d = FF(d, a, b, c, x[k + 5], 12, 0x4787C62A);
-        c = FF(c, d, a, b, x[k + 6], 17, 0xA8304613);
-        b = FF(b, c, d, a, x[k + 7], 22, 0xFD469501);
-        a = FF(a, b, c, d, x[k + 8], 7, 0x698098D8);
-        d = FF(d, a, b, c, x[k + 9], 12, 0x8B44F7AF);
-        c = FF(c, d, a, b, x[k + 10], 17, 0xFFFF5BB1);
-        b = FF(b, c, d, a, x[k + 11], 22, 0x895CD7BE);
-        a = FF(a, b, c, d, x[k + 12], 7, 0x6B901122);
-        d = FF(d, a, b, c, x[k + 13], 12, 0xFD987193);
-        c = FF(c, d, a, b, x[k + 14], 17, 0xA679438E);
-        b = FF(b, c, d, a, x[k + 15], 22, 0x49B40821);
-        
-        a = GG(a, b, c, d, x[k + 1], 5, 0xF61E2562);
-        d = GG(d, a, b, c, x[k + 6], 9, 0xC040B340);
-        c = GG(c, d, a, b, x[k + 11], 14, 0x265E5A51);
-        b = GG(b, c, d, a, x[k + 0], 20, 0xE9B6C7AA);
-        a = GG(a, b, c, d, x[k + 5], 5, 0xD62F105D);
-        d = GG(d, a, b, c, x[k + 10], 9, 0x2441453);
-        c = GG(c, d, a, b, x[k + 15], 14, 0xD8A1E681);
-        b = GG(b, c, d, a, x[k + 4], 20, 0xE7D3FBC8);
-        a = GG(a, b, c, d, x[k + 9], 5, 0x21E1CDE6);
-        d = GG(d, a, b, c, x[k + 14], 9, 0xC33707D6);
-        c = GG(c, d, a, b, x[k + 3], 14, 0xF4D50D87);
-        b = GG(b, c, d, a, x[k + 8], 20, 0x455A14ED);
-        a = GG(a, b, c, d, x[k + 13], 5, 0xA9E3E905);
-        d = GG(d, a, b, c, x[k + 2], 9, 0xFCEFA3F8);
-        c = GG(c, d, a, b, x[k + 7], 14, 0x676F02D9);
-        b = GG(b, c, d, a, x[k + 12], 20, 0x8D2A4C8A);
-        
-        a = HH(a, b, c, d, x[k + 5], 4, 0xFFFA3942);
-        d = HH(d, a, b, c, x[k + 8], 11, 0x8771F681);
-        c = HH(c, d, a, b, x[k + 11], 16, 0x6D9D6122);
-        b = HH(b, c, d, a, x[k + 14], 23, 0xFDE5380C);
-        a = HH(a, b, c, d, x[k + 1], 4, 0xA4BEEA44);
-        d = HH(d, a, b, c, x[k + 4], 11, 0x4BDECFA9);
-        c = HH(c, d, a, b, x[k + 7], 16, 0xF6BB4B60);
-        b = HH(b, c, d, a, x[k + 10], 23, 0xBEBFBC70);
-        a = HH(a, b, c, d, x[k + 13], 4, 0x289B7EC6);
-        d = HH(d, a, b, c, x[k + 0], 11, 0xEAA127FA);
-        c = HH(c, d, a, b, x[k + 3], 16, 0xD4EF3085);
-        b = HH(b, c, d, a, x[k + 6], 23, 0x4881D05);
-        a = HH(a, b, c, d, x[k + 9], 4, 0xD9D4D039);
-        d = HH(d, a, b, c, x[k + 12], 11, 0xE6DB99E5);
-        c = HH(c, d, a, b, x[k + 15], 16, 0x1FA27CF8);
-        b = HH(b, c, d, a, x[k + 2], 23, 0xC4AC5665);
-        
-        a = II(a, b, c, d, x[k + 0], 6, 0xF4292244);
-        d = II(d, a, b, c, x[k + 7], 10, 0x432AFF97);
-        c = II(c, d, a, b, x[k + 14], 15, 0xAB9423A7);
-        b = II(b, c, d, a, x[k + 5], 21, 0xFC93A039);
-        a = II(a, b, c, d, x[k + 12], 6, 0x655B59C3);
-        d = II(d, a, b, c, x[k + 3], 10, 0x8F0CCC92);
-        c = II(c, d, a, b, x[k + 10], 15, 0xFFEFF47D);
-        b = II(b, c, d, a, x[k + 1], 21, 0x85845DD1);
-        a = II(a, b, c, d, x[k + 8], 6, 0x6FA87E4F);
-        d = II(d, a, b, c, x[k + 15], 10, 0xFE2CE6E0);
-        c = II(c, d, a, b, x[k + 6], 15, 0xA3014314);
-        b = II(b, c, d, a, x[k + 13], 21, 0x4E0811A1);
-        a = II(a, b, c, d, x[k + 4], 6, 0xF7537E82);
-        d = II(d, a, b, c, x[k + 11], 10, 0xBD3AF235);
-        c = II(c, d, a, b, x[k + 2], 15, 0x2AD7D2BB);
-        b = II(b, c, d, a, x[k + 9], 21, 0xEB86D391);
-        
-        a = addUnsigned(a, AA);
-        b = addUnsigned(b, BB);
-        c = addUnsigned(c, CC);
-        d = addUnsigned(d, DD);
+
+    function md5blk(s: string) {
+        const md5blks = [];
+        for (let i = 0; i < 64; i += 4) {
+            md5blks[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i + 1) << 8) + (s.charCodeAt(i + 2) << 16) + (s.charCodeAt(i + 3) << 24);
+        }
+        return md5blks;
     }
-    
-    return (wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d)).toLowerCase();
+
+    function rhex(n: number) {
+        const s = '0123456789abcdef';
+        let j: number, tmp = '';
+        for (let i = 0; i < 4; i++) {
+            j = (n >> (i * 8)) & 255;
+            tmp += s.charAt((j >> 4) & 15) + s.charAt(j & 15);
+        }
+        return tmp;
+    }
+
+    function hex(x: number[]) {
+        for (let i = 0; i < x.length; i++) {
+            x[i] = rhex(x[i]);
+        }
+        return x.join('');
+    }
+
+    function add32(a: number, b: number) {
+        return (a + b) & 0xFFFFFFFF;
+    }
+
+    return hex(md51(text));
 }
 
 // --- 辅助函数：创建 JSON 错误响应 ---
@@ -402,34 +384,49 @@ serve(async (req) => {
                 to_lang = 'en'; // 混合文本翻译成英文
             }
 
-            // 生成随机盐值
-            const salt = Date.now().toString();
+            // 生成随机盐值 (10位随机数字)
+            const salt = Math.floor(Math.random() * 10000000000).toString();
             
-            // 生成MD5签名 (appid + q + salt + secret)
+            // 关键修复：按照百度API规范生成签名
+            // 签名格式: MD5(appid + q + salt + key)
+            // 注意：q参数在拼接前不能进行URL编码，必须是原始UTF-8字符串
             const signString = appid + text + salt + secret;
             const sign = md5(signString);
-
-            // 构建百度翻译API请求
-            const translateUrl = new URL("https://fanyi-api.baidu.com/api/trans/vip/translate");
-            translateUrl.searchParams.append("q", text);
-            translateUrl.searchParams.append("from", "auto");
-            translateUrl.searchParams.append("to", to_lang);
-            translateUrl.searchParams.append("appid", appid);
-            translateUrl.searchParams.append("salt", salt);
-            translateUrl.searchParams.append("sign", sign);
-
-            console.log("发送翻译请求到百度API:", {
-                url: translateUrl.toString().replace(secret, "***SECRET***"),
-                from: "auto",
-                to: to_lang,
-                text_length: text.length
+            
+            console.log("签名生成信息:", {
+                appid,
+                q: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
+                salt,
+                signString: signString.replace(secret, '***SECRET***'),
+                sign
             });
 
-            const response = await fetch(translateUrl.toString(), {
-                method: "GET",
+            // 构建POST请求参数（使用application/x-www-form-urlencoded格式）
+            const params = new URLSearchParams();
+            params.append('q', text);  // 原始文本，不进行URL编码
+            params.append('from', 'auto');
+            params.append('to', to_lang);
+            params.append('appid', appid);
+            params.append('salt', salt);
+            params.append('sign', sign);
+
+            console.log("发送翻译请求到百度API:", {
+                endpoint: "https://fanyi-api.baidu.com/api/trans/vip/translate",
+                method: "POST",
+                contentType: "application/x-www-form-urlencoded",
+                from: "auto",
+                to: to_lang,
+                text_length: text.length,
+                params_length: params.toString().length
+            });
+
+            const response = await fetch("https://fanyi-api.baidu.com/api/trans/vip/translate", {
+                method: "POST",
                 headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
                     "User-Agent": "Mozilla/5.0 (compatible; Deno-Translation/1.0)"
-                }
+                },
+                body: params.toString()
             });
 
             if (!response.ok) {
@@ -444,6 +441,9 @@ serve(async (req) => {
             if (result.error_code) {
                 let errorMessage = "翻译服务错误";
                 switch (result.error_code) {
+                    case '52000':
+                        errorMessage = "翻译成功（不应该出现此错误）";
+                        break;
                     case '52001':
                         errorMessage = "翻译服务请求超时，请稍后重试";
                         break;
@@ -453,11 +453,20 @@ serve(async (req) => {
                     case '52003':
                         errorMessage = "翻译服务认证失败，请检查API配置";
                         break;
+                    case '54000':
+                        errorMessage = "翻译服务参数缺失";
+                        break;
+                    case '54001':
+                        errorMessage = "翻译服务签名错误，请检查API配置";
+                        break;
                     case '54003':
                         errorMessage = "翻译服务请求频率限制，请稍后重试";
                         break;
+                    case '54004':
+                        errorMessage = "翻译服务账户余额不足";
+                        break;
                     case '54005':
-                        errorMessage = "翻译服务请求格式错误";
+                        errorMessage = "翻译服务请求过于频繁，请等待3秒";
                         break;
                     case '58000':
                         errorMessage = "翻译服务客户端IP非法";
@@ -465,9 +474,13 @@ serve(async (req) => {
                     case '58001':
                         errorMessage = "翻译服务服务不支持该语言";
                         break;
+                    case '90107':
+                        errorMessage = "翻译服务认证失败或未生效";
+                        break;
                     default:
-                        errorMessage = `翻译服务错误 (错误代码: ${result.error_code})`;
+                        errorMessage = `翻译服务错误 (错误代码: ${result.error_code}, 错误信息: ${result.error_msg || '未知错误'})`;
                 }
+                console.error("百度翻译API错误:", result);
                 return createJsonErrorResponse(errorMessage, 500);
             }
 
@@ -477,15 +490,15 @@ serve(async (req) => {
                 console.log("翻译成功:", {
                     original: text,
                     translated: translatedText,
-                    from: "auto",
-                    to: to_lang
+                    from: result.from,
+                    to: result.to
                 });
                 
                 return new Response(JSON.stringify({ 
                     translated: translatedText,
                     original: text,
-                    from: "auto",
-                    to: to_lang
+                    from: result.from,
+                    to: result.to
                 }), {
                     headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
                 });
