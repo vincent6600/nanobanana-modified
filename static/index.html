@@ -22,7 +22,7 @@
 
     <h1 class="title">融图AI-生图工具</h1>
 
-    <!-- 模型选择器（调整顺序：ChatGPT → Nano Banana → Qwen-Image → Flux → Kontext → Krea） -->
+    <!-- 模型选择器 -->
     <div class="model-selector-container">
         <div class="model-card active" data-model="chatgpt">ChatGPT-5</div>
         <div class="model-card" data-model="nanobanana">Nano Banana</div>
@@ -34,9 +34,7 @@
 
     <div class="main-container">
         <div class="controls-container">
-            <!-- ======================================================= -->
-            <!-- ChatGPT 的控制面板 -->
-            <!-- ======================================================= -->
+            <!-- ChatGPT 控制面板 -->
             <div id="chatgpt-controls" class="hidden">
                 <div class="api-key-section">
                     <h2>设置 <span class="prompt-remark">(请注意目前调用的是付费的ChatGPT-5模型)</span></h2>
@@ -61,16 +59,13 @@
                     </h2>
                     <textarea id="prompt-input-chatgpt" placeholder="例如：一只穿着超级英雄斗篷的猫，电影级灯光"></textarea>
                 </div>
-                <!-- ChatGPT 专用的生成按钮 -->
                 <button class="generate-btn">
                     <span class="btn-text">生成</span>
                     <span class="spinner hidden"></span>
                 </button>
             </div>
 
-            <!-- ======================================================= -->
-            <!-- nano banana 的控制面板 -->
-            <!-- ======================================================= -->
+            <!-- Nano Banana 控制面板 -->
             <div id="nanobanana-controls" class="hidden">
                 <div class="api-key-section">
                     <h2>设置 <span class="prompt-remark">(请注意目前调用的是付费的Nano Banana模型)</span></h2>
@@ -95,16 +90,13 @@
                     </h2>
                     <textarea id="prompt-input-nanobanana" placeholder="例如：一只穿着超级英雄斗篷的猫，电影级灯光"></textarea>
                 </div>
-                <!-- Nano Banana 专用的生成按钮 -->
                 <button class="generate-btn">
                     <span class="btn-text">生成</span>
                     <span class="spinner hidden"></span>
                 </button>
             </div>
 
-            <!-- ======================================================= -->
-            <!-- ModelScope 模型的控制面板 -->
-            <!-- ======================================================= -->
+            <!-- ModelScope 模型控制面板 -->
             <div id="modelscope-controls" class="hidden">
                 <div class="api-key-section">
                     <h2>设置</h2>
@@ -156,7 +148,6 @@
                         <input type="number" id="count-input" min="1" max="4" value="1">
                     </div>
                 </div>
-                <!-- ModelScope 专用的生成按钮 -->
                 <button class="generate-btn">
                     <span class="btn-text">生成</span>
                     <span class="spinner hidden"></span>
