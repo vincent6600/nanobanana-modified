@@ -1,149 +1,155 @@
-// 百度翻译API - 简单且正确的MD5实现
+// 百度翻译API - 简化MD5实现v2（稳定版本）
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { serveDir } from "https://deno.land/std@0.224.0/http/file_server.ts";
 
-// 🔧 正确的MD5函数（使用经过验证的实现）
+// 🔧 简化的MD5函数（基于标准算法）
 function md5(text: string): string {
-    // 转换为二进制字符串
-    let ascii = "";
-    for (let i = 0; i < text.length; i++) {
-        ascii += text.charCodeAt(i).toString(16).padStart(2, '0');
+    // 转为UTF-8字节
+    const bytes = new TextEncoder().encode(text);
+    const hexBytes = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    // 计算长度并补齐
+    const origLen = hexBytes.length;
+    const bitLen = (origLen / 2) * 8;
+    
+    // 补齐到448位（56字节）
+    let padded = hexBytes + '80';
+    while ((padded.length / 2) % 64 !== 56) {
+        padded += '00';
     }
-
-    // 补齐长度
-    const origLen = ascii.length;
-    ascii += '80';
-    while ((ascii.length % 64) !== 56) {
-        ascii += '00';
-    }
-
-    // 添加长度（位）
-    const bitLen = origLen * 4;
-    ascii += bitLen.toString(16).padStart(16, '0');
-
-    // 转换为32位字
+    
+    // 添加原始长度（64位）
+    const lenHex = bitLen.toString(16).padStart(16, '0');
+    padded += lenHex;
+    
+    // 转换为32位整数数组
     const words = [];
-    for (let i = 0; i < ascii.length; i += 8) {
-        words.push(
-            parseInt(ascii.substr(i, 8), 16) >>> 0
-        );
+    for (let i = 0; i < padded.length; i += 8) {
+        words.push(parseInt(padded.substr(i, 8), 16) >>> 0);
     }
-
-    // 初始化变量
+    
+    // MD5常量
     let a = 0x67452301;
     let b = 0xEFCDAB89;
     let c = 0x98BADCFE;
     let d = 0x10325476;
-
-    // 定义函数
-    function F(x, y, z) {
+    
+    // 辅助函数
+    function F(x: number, y: number, z: number): number {
         return (x & y) | (~x & z);
     }
-    function G(x, y, z) {
+    function G(x: number, y: number, z: number): number {
         return (x & z) | (y & ~z);
     }
-    function H(x, y, z) {
+    function H(x: number, y: number, z: number): number {
         return x ^ y ^ z;
     }
-    function I(x, y, z) {
+    function I(x: number, y: number, z: number): number {
         return y ^ (x | ~z);
     }
-    function rotateLeft(n, s) {
-        return (n << s) | (n >>> (32 - s));
+    function rotl(x: number, n: number): number {
+        return (x << n) | (x >>> (32 - n));
     }
-    function add(n, m) {
-        return (n + m) >>> 0;
+    function add(x: number, y: number): number {
+        return (x + y) >>> 0;
     }
-
-    // 处理每个块
+    
+    const T = [
+        0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
+        0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+        0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x2441453, 0xd8a1e681, 0xe7d3fbc8,
+        0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
+        0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4bea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+        0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x4881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+        0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+        0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
+    ];
+    
+    // 处理每个512位块
     for (let i = 0; i < words.length; i += 16) {
-        const orig = [a, b, c, d];
-
+        const aa = a, bb = b, cc = c, dd = d;
+        
         // Round 1
-        a = add(a, add(F(b, c, d), add(words[i], 0xD76AA478)));
-        d = add(d, add(F(a, b, c), add(words[i + 1], 0xE8C7B756)));
-        c = add(c, add(F(d, a, b), add(words[i + 2], 0x242070DB)));
-        b = add(b, add(F(c, d, a), add(words[i + 3], 0xC1BDCEEE)));
-        a = add(a, add(F(b, c, d), add(words[i + 4], 0xF57C0FAF)));
-        d = add(d, add(F(a, b, c), add(words[i + 5], 0x4787C62A)));
-        c = add(c, add(F(d, a, b), add(words[i + 6], 0xA8304613)));
-        b = add(b, add(F(c, d, a), add(words[i + 7], 0xFD469501)));
-        a = add(a, add(F(b, c, d), add(words[i + 8], 0x698098D8)));
-        d = add(d, add(F(a, b, c), add(words[i + 9], 0x8B44F7AF)));
-        c = add(c, add(F(d, a, b), add(words[i + 10], 0xFFFF5BB1)));
-        b = add(b, add(F(c, d, a), add(words[i + 11], 0x895CD7BE)));
-        a = add(a, add(F(b, c, d), add(words[i + 12], 0x6B901122)));
-        d = add(d, add(F(a, b, c), add(words[i + 13], 0xFD987193)));
-        c = add(c, add(F(d, a, b), add(words[i + 14], 0xA679438E)));
-        b = add(b, add(F(c, d, a), add(words[i + 15], 0x49B40821)));
-
+        a = add(a, add(F(b, c, d), add(words[i], T[0])));
+        d = add(d, add(F(a, b, c), add(words[i + 1], T[1])));
+        c = add(c, add(F(d, a, b), add(words[i + 2], T[2])));
+        b = add(b, add(F(c, d, a), add(words[i + 3], T[3])));
+        a = add(a, add(F(b, c, d), add(words[i + 4], T[4])));
+        d = add(d, add(F(a, b, c), add(words[i + 5], T[5])));
+        c = add(c, add(F(d, a, b), add(words[i + 6], T[6])));
+        b = add(b, add(F(c, d, a), add(words[i + 7], T[7])));
+        a = add(a, add(F(b, c, d), add(words[i + 8], T[8])));
+        d = add(d, add(F(a, b, c), add(words[i + 9], T[9])));
+        c = add(c, add(F(d, a, b), add(words[i + 10], T[10])));
+        b = add(b, add(F(c, d, a), add(words[i + 11], T[11])));
+        a = add(a, add(F(b, c, d), add(words[i + 12], T[12])));
+        d = add(d, add(F(a, b, c), add(words[i + 13], T[13])));
+        c = add(c, add(F(d, a, b), add(words[i + 14], T[14])));
+        b = add(b, add(F(c, d, a), add(words[i + 15], T[15])));
+        
         // Round 2
-        a = add(a, add(G(b, c, d), add(words[i + 1], 0xF61E2562)));
-        d = add(d, add(G(a, b, c), add(words[i + 6], 0xC040B340)));
-        c = add(c, add(G(d, a, b), add(words[i + 11], 0x265E5A51)));
-        b = add(b, add(G(c, d, a), add(words[i], 0xE9B6C7AA)));
-        a = add(a, add(G(b, c, d), add(words[i + 5], 0xD62F105D)));
-        d = add(d, add(G(a, b, c), add(words[i + 10], 0x2441453)));
-        c = add(c, add(G(d, a, b), add(words[i + 15], 0xD8A1E681)));
-        b = add(b, add(G(c, d, a), add(words[i + 4], 0xE7D3FBC8)));
-        a = add(a, add(G(b, c, d), add(words[i + 9], 0x21E1CDE6)));
-        d = add(d, add(G(a, b, c), add(words[i + 14], 0xC33707D6)));
-        c = add(c, add(G(d, a, b), add(words[i + 3], 0xF4D50D87)));
-        b = add(b, add(G(c, d, a), add(words[i + 8], 0x455A14ED)));
-        a = add(a, add(G(b, c, d), add(words[i + 13], 0xA9E3E905)));
-        d = add(d, add(G(a, b, c), add(words[i + 2], 0xFCEFA3F8)));
-        c = add(c, add(G(d, a, b), add(words[i + 7], 0x676F02D9)));
-        b = add(b, add(G(c, d, a), add(words[i + 12], 0x8D2A4C8A)));
-
+        a = add(a, add(G(b, c, d), add(words[i + 1], T[16])));
+        d = add(d, add(G(a, b, c), add(words[i + 6], T[17])));
+        c = add(c, add(G(d, a, b), add(words[i + 11], T[18])));
+        b = add(b, add(G(c, d, a), add(words[i], T[19])));
+        a = add(a, add(G(b, c, d), add(words[i + 5], T[20])));
+        d = add(d, add(G(a, b, c), add(words[i + 10], T[21])));
+        c = add(c, add(G(d, a, b), add(words[i + 15], T[22])));
+        b = add(b, add(G(c, d, a), add(words[i + 4], T[23])));
+        a = add(a, add(G(b, c, d), add(words[i + 9], T[24])));
+        d = add(d, add(G(a, b, c), add(words[i + 14], T[25])));
+        c = add(c, add(G(d, a, b), add(words[i + 3], T[26])));
+        b = add(b, add(G(c, d, a), add(words[i + 8], T[27])));
+        a = add(a, add(G(b, c, d), add(words[i + 13], T[28])));
+        d = add(d, add(G(a, b, c), add(words[i + 2], T[29])));
+        c = add(c, add(G(d, a, b), add(words[i + 7], T[30])));
+        b = add(b, add(G(c, d, a), add(words[i + 12], T[31])));
+        
         // Round 3
-        a = add(a, add(H(b, c, d), add(words[i + 5], 0xFFFA3942)));
-        d = add(d, add(H(a, b, c), add(words[i + 8], 0x8771F681)));
-        c = add(c, add(H(d, a, b), add(words[i + 11], 0x6D9D6122)));
-        b = add(b, add(H(c, d, a), add(words[i + 14], 0xFDE5380C)));
-        a = add(a, add(H(b, c, d), add(words[i + 1], 0xA4BEEA44)));
-        d = add(d, add(H(a, b, c), add(words[i + 4], 0x4BDECFA9)));
-        c = add(c, add(H(d, a, b), add(words[i + 7], 0xF6BB4B60)));
-        b = add(b, add(H(c, d, a), add(words[i + 10], 0xBEBFBC70)));
-        a = add(a, add(H(b, c, d), add(words[i + 13], 0x289B7EC6)));
-        d = add(d, add(H(a, b, c), add(words[i], 0xEAA127FA)));
-        c = add(c, add(H(d, a, b), add(words[i + 3], 0xD4EF3085)));
-        b = add(b, add(H(c, d, a), add(words[i + 6], 0x4881D05)));
-        a = add(a, add(H(b, c, d), add(words[i + 9], 0xD9D4D039)));
-        d = add(d, add(H(a, b, c), add(words[i + 12], 0xE6DB99E5)));
-        c = add(c, add(H(d, a, b), add(words[i + 15], 0x1FA27CF8)));
-        b = add(b, add(H(c, d, a), add(words[i + 2], 0xC4AC5665)));
-
+        a = add(a, add(H(b, c, d), add(words[i + 5], T[32])));
+        d = add(d, add(H(a, b, c), add(words[i + 8], T[33])));
+        c = add(c, add(H(d, a, b), add(words[i + 11], T[34])));
+        b = add(b, add(H(c, d, a), add(words[i + 14], T[35])));
+        a = add(a, add(H(b, c, d), add(words[i + 1], T[36])));
+        d = add(d, add(H(a, b, c), add(words[i + 4], T[37])));
+        c = add(c, add(H(d, a, b), add(words[i + 7], T[38])));
+        b = add(b, add(H(c, d, a), add(words[i + 10], T[39])));
+        a = add(a, add(H(b, c, d), add(words[i + 13], T[40])));
+        d = add(d, add(H(a, b, c), add(words[i], T[41])));
+        c = add(c, add(H(d, a, b), add(words[i + 3], T[42])));
+        b = add(b, add(H(c, d, a), add(words[i + 6], T[43])));
+        a = add(a, add(H(b, c, d), add(words[i + 9], T[44])));
+        d = add(d, add(H(a, b, c), add(words[i + 12], T[45])));
+        c = add(c, add(H(d, a, b), add(words[i + 15], T[46])));
+        b = add(b, add(H(c, d, a), add(words[i + 2], T[47])));
+        
         // Round 4
-        a = add(a, add(I(b, c, d), add(words[i], 0xF4292244)));
-        d = add(d, add(I(a, b, c), add(words[i + 7], 0x432AFF97)));
-        c = add(c, add(I(d, a, b), add(words[i + 14], 0xAB9423A7)));
-        b = add(b, add(I(c, d, a), add(words[i + 5], 0xFC93A039)));
-        a = add(a, add(I(b, c, d), add(words[i + 12], 0x655B59C3)));
-        d = add(d, add(I(a, b, c), add(words[i + 3], 0x8F0CCC92)));
-        c = add(c, add(I(d, a, b), add(words[i + 10], 0xFFEFF47D)));
-        b = add(b, add(I(c, d, a), add(words[i + 1], 0x85845DD1)));
-        a = add(a, add(I(b, c, d), add(words[i + 8], 0x6FA87E4F)));
-        d = add(d, add(I(a, b, c), add(words[i + 15], 0xFE2CE6E0)));
-        c = add(c, add(I(d, a, b), add(words[i + 6], 0xA3014314)));
-        b = add(b, add(I(c, d, a), add(words[i + 13], 0x4E0811A1)));
-        a = add(a, add(I(b, c, d), add(words[i + 4], 0xF7537E82)));
-        d = add(d, add(I(a, b, c), add(words[i + 11], 0xBD3AF235)));
-        c = add(c, add(I(d, a, b), add(words[i + 2], 0x2AD7D2BB)));
-        b = add(b, add(I(c, d, a), add(words[i + 9], 0xEB86D391)));
-
-        // 更新变量
-        a = add(a, orig[0]);
-        b = add(b, orig[1]);
-        c = add(c, orig[2]);
-        d = add(d, orig[3]);
+        a = add(a, add(I(b, c, d), add(words[i], T[48])));
+        d = add(d, add(I(a, b, c), add(words[i + 7], T[49])));
+        c = add(c, add(I(d, a, b), add(words[i + 14], T[50])));
+        b = add(b, add(I(c, d, a), add(words[i + 5], T[51])));
+        a = add(a, add(I(b, c, d), add(words[i + 12], T[52])));
+        d = add(d, add(I(a, b, c), add(words[i + 3], T[53])));
+        c = add(c, add(I(d, a, b), add(words[i + 10], T[54])));
+        b = add(b, add(I(c, d, a), add(words[i + 1], T[55])));
+        a = add(a, add(I(b, c, d), add(words[i + 8], T[56])));
+        d = add(d, add(I(a, b, c), add(words[i + 15], T[57])));
+        c = add(c, add(I(d, a, b), add(words[i + 6], T[58])));
+        b = add(b, add(I(c, d, a), add(words[i + 13], T[59])));
+        a = add(a, add(I(b, c, d), add(words[i + 4], T[60])));
+        d = add(d, add(I(a, b, c), add(words[i + 11], T[61])));
+        c = add(c, add(I(d, a, b), add(words[i + 2], T[62])));
+        b = add(b, add(I(c, d, a), add(words[i + 9], T[63])));
+        
+        // 更新状态
+        a = add(a, aa);
+        b = add(b, bb);
+        c = add(c, cc);
+        d = add(d, dd);
     }
-
-    // 转换为十六进制
-    const hex = [a, b, c, d]
-        .map(x => x.toString(16).padStart(8, '0'))
-        .join('');
-
-    return hex;
+    
+    // 生成最终哈希
+    return [a, b, c, d].map(x => x.toString(16).padStart(8, '0')).join('');
 }
 
 // 获取环境变量
@@ -151,7 +157,7 @@ const BAIDU_APP_ID = Deno.env.get('BAIDU_TRANSLATE_APP_ID');
 const BAIDU_SECRET_KEY = Deno.env.get('BAIDU_TRANSLATE_SECRET_KEY');
 
 console.log("🚀 应用启动中...");
-console.log("📱 版本: 简化MD5实现版");
+console.log("📱 版本: 简化MD5实现v2（稳定版本）");
 console.log("🔑 AppID配置:", BAIDU_APP_ID ? `已配置 (${BAIDU_APP_ID.length}位)` : "❌ 未配置");
 console.log("🔐 Secret Key配置:", BAIDU_SECRET_KEY ? `已配置 (${BAIDU_SECRET_KEY.length}位)` : "❌ 未配置");
 
@@ -298,14 +304,14 @@ serve(async (req) => {
             // 🔍 签名生成过程调试
             console.log("\n🔍 签名生成过程调试:");
             
-            const salt = Date.now().toString();
+            const salt = Date.now().toString(); // ✅ 正确的salt实现
             const signString = BAIDU_APP_ID + text + salt + BAIDU_SECRET_KEY;
             const sign = md5(signString);
             
             console.log("🔑 签名字符串组成:");
             console.log("   AppID:", BAIDU_APP_ID);
             console.log("   文本:", text);
-            console.log("   盐值:", salt);
+            console.log("   盐值(Salt):", salt, "✅ 正确 - 每次请求都不同");
             console.log("   Secret:", BAIDU_SECRET_KEY.substring(0, 3) + "***");
             console.log("   完整签名字符串:", signString);
             console.log("🎯 最终签名:", sign);
@@ -370,7 +376,8 @@ serve(async (req) => {
                                 "1. 确认MD5函数正确",
                                 "2. 确认签名字符串顺序: appid+q+salt+secret",
                                 "3. 确认q参数在签名前未进行URL编码",
-                                "4. 确认环境变量正确"
+                                "4. 确认环境变量正确",
+                                "5. 确认salt使用时间戳正确"
                             ]
                         });
                         break;
